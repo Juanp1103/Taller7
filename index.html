@@ -3,19 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <title>Mi primer modelo Three.js</title>
-<style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #111; }
-  #info {
-    position: absolute; top: 10px; left: 10px; color: #fff;
-    font-family: sans-serif; font-size: 14px; background: rgba(0,0,0,0.5);
-    padding: 8px 12px; border-radius: 6px; z-index: 10;
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="info">Click y arrastra para rotar &nbsp;|&nbsp; Scroll para zoom &nbsp;|&nbsp; Click derecho + arrastrar para mover</div>
 
-<!-- 1. Cargamos Three.js y el helper OrbitControls desde un CDN -->
+<div id="panel">
+  <button id="btn-eye">👁 Ojo</button>
+  <button id="btn-reset">Vista general</button>
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -25,109 +22,6 @@
 }
 </script>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-// ----------------------------------------------------
-// 2. ESCENA: el "espacio" donde viven los objetos 3D
-// ----------------------------------------------------
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1a2e);
-
-// ----------------------------------------------------
-// 3. CÁMARA: define desde dónde vemos la escena
-//    PerspectiveCamera(fov, aspecto, near, far)
-// ----------------------------------------------------
-const camera = new THREE.PerspectiveCamera(
-  50,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.set(3, 3, 5); // posición inicial (x, y, z)
-
-// ----------------------------------------------------
-// 4. RENDERER: dibuja la escena en un <canvas>
-// ----------------------------------------------------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-document.body.appendChild(renderer.domElement);
-
-// ----------------------------------------------------
-// 5. LUCES: sin luz, los materiales "standard" se ven negros
-// ----------------------------------------------------
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(5, 10, 7);
-scene.add(dirLight);
-
-// ----------------------------------------------------
-// 6. CONTROLES DE MOUSE: OrbitControls
-//    Esto es lo que te permite "mover" el modelo con el mouse
-//    (en realidad mueve la cámara alrededor del modelo)
-// ----------------------------------------------------
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // suaviza el movimiento (inercia)
-controls.dampingFactor = 0.05;
-controls.minDistance = 1.5;
-controls.maxDistance = 20;
-
-// ----------------------------------------------------
-// 7. MODELO DE EJEMPLO (cubo) — descomenta si quieres volver al cubo de prueba
-// ----------------------------------------------------
-/*
-const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-const material = new THREE.MeshStandardMaterial({ color: 0x4fc3f7 });
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
-
-// Un plano de referencia (suelo) para dar sensación de espacio
-const grid = new THREE.GridHelper(20, 20, 0x444466, 0x222233);
-scene.add(grid);
-*/
-
-// ----------------------------------------------------
-// 7b. CARGA DEL MODELO PROPIO (.glb)
-// ----------------------------------------------------
-const loader = new GLTFLoader();
-loader.load(
-  './models/ModeloPrototipo.glb',
-  (gltf) => {
-    scene.add(gltf.scene);
-  },
-  (progress) => {
-    console.log('Cargando...', (progress.loaded / progress.total * 100).toFixed(0) + '%');
-  },
-  (error) => {
-    console.error('Error cargando el modelo:', error);
-  }
-);
-
-// ----------------------------------------------------
-// 8. RESPONSIVE: ajustar cuando cambia el tamaño de ventana
-// ----------------------------------------------------
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// ----------------------------------------------------
-// 9. LOOP DE ANIMACIÓN: se ejecuta ~60 veces por segundo
-// ----------------------------------------------------
-function animate() {
-  requestAnimationFrame(animate);
-
-  controls.update(); // necesario porque enableDamping = true
-  renderer.render(scene, camera);
-}
-
-animate();
-</script>
+<script type="module" src="main.js"></script>
 </body>
 </html>
