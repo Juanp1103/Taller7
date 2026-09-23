@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "taller7",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8891"],
+      "port": 8891
+    }
+  ]
+}
