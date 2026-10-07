@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimClin · Facilitador</title>
+<style>
+  :root { --fondo:#0a111c; --tarjeta:#0f1a29; --borde:#1f3148; --texto:#e6edf5; --texto-2:#8a9bb0; --texto-3:#5b6c80;
+    --cian:#22c3e6; --ok:#22c55e; --warn:#f5a524; --crit:#f04848;
+    --mono:"JetBrains Mono",Consolas,ui-monospace,monospace; --sans:"Inter","Segoe UI",system-ui,sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--sans); padding: 24px; }
+  .marca { font-family: var(--mono); font-size: 12px; letter-spacing: .2em; color: var(--cian); }
+  h1 { margin: 6px 0 18px; font-size: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; }
+  .card { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; padding: 18px; }
+  .card h2 { margin: 0 0 14px; font-size: 13px; letter-spacing: .16em; font-family: var(--mono); color: var(--texto-2); font-weight: 600; }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  button, select, input[type=text], input[type=number] { font: inherit; color: var(--texto); background: #14233a; border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; }
+  button { cursor: pointer; font-weight: 600; }
+  button:hover { border-color: var(--cian); }
+  button.primario { background: rgba(34,195,230,.15); border-color: var(--cian); color: var(--cian); }
+  button.peligro { border-color: rgba(240,72,72,.5); color: #ff8a8a; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  input[type=range] { width: 100%; accent-color: var(--cian); }
+  .dato { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--borde); font-size: 14.5px; }
+  .dato:last-child { border-bottom: 0; }
+  .dato span:first-child { color: var(--texto-2); }
+  .v { font-family: var(--mono); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .crit { color: var(--crit); }
+  .qr { background: #fff; border-radius: 12px; padding: 8px; width: 170px; height: 170px; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .urls { font-family: var(--mono); font-size: 13px; color: var(--cian); word-break: break-all; }
+  .opcion-url { display: flex; gap: 8px; align-items: flex-start; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .opcion-url:hover { background: #14233a; }
+  .opcion-url input { margin-top: 3px; accent-color: var(--cian); }
+  .opcion-url .et { font-family: var(--sans); font-size: 12px; color: var(--texto-3); display: block; }
+  .ayuda-red { font-size: 12.5px; color: var(--texto-3); line-height: 1.5; margin-top: 10px; border-top: 1px dashed var(--borde); padding-top: 10px; }
+  .ayuda-red b { color: var(--warn); }
+  .ayuda-red code { font-family: var(--mono); font-size: 11.5px; color: var(--cian); }
+  .pasos-red { margin: 8px 0 0; padding-left: 18px; }
+  .pasos-red li { margin-bottom: 6px; }
+  .nota { font-size: 13px; color: var(--texto-3); line-height: 1.5; margin: 8px 0 0; }
+  .registro { font-family: var(--mono); font-size: 12px; max-height: 320px; overflow: auto; background: #08101a; border-radius: 10px; padding: 10px; border: 1px solid var(--borde); }
+  .registro div { padding: 3px 0; border-bottom: 1px solid #101c2b; color: var(--texto-2); }
+  .registro b { color: var(--texto); font-weight: 600; }
+  label.sw { display: flex; gap: 10px; align-items: center; font-size: 14.5px; margin: 8px 0; cursor: pointer; }
+  .aviso-real { font-size: 13px; color: var(--ok); margin-top: 6px; display: none; }
+  .aviso-real.si { display: block; }
+  .mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mini div { background: #0b1522; border: 1px solid var(--borde); border-radius: 10px; padding: 8px 10px; }
+  .mini small { display: block; color: var(--texto-3); font-family: var(--mono); font-size: 11px; }
+  .mini b { font-family: var(--mono); font-size: 20px; }
+</style>
+</head>
+<body>
+  <div class="marca">SIMCLIN · PANEL DEL FACILITADOR</div>
+  <h1>Prueba de usuario</h1>
+
+  <div class="grid">
+    <div class="card">
+      <h2>CASO</h2>
+      <div class="fila">
+        <select id="escenario"></select>
+      </div>
+      <div class="fila">
+        <button class="primario" id="btnIniciar">Iniciar caso</button>
+        <button id="btnPausar">Pausar</button>
+        <button class="peligro" id="btnReiniciar">Reiniciar</button>
+      </div>
+      <div class="dato"><span>Tiempo del caso</span><span class="v" id="tiempo">00:00</span></div>
+      <div class="dato"><span>Estado del paciente</span><span class="v" id="estadoPac">—</span></div>
+      <div class="dato"><span>Sistema en el televisor</span><span class="v" id="sistema">Vista general</span></div>
+      <label class="sw"><input type="checkbox" id="mostrarDx"> Mostrar el diagnóstico en el título del monitor</label>
+      <label class="sw"><input type="checkbox" id="mostrarConteos" checked> Mostrar conteo de críticos en el celular</label>
+      <label class="sw"><input type="checkbox" id="soloModelados" checked> Solo los sistemas que ya tienen modelo 3D</label>
+      <p class="nota">Por defecto el monitor NO muestra el diagnóstico (solo "Caso A / Caso B"), para que los estudiantes lo deduzcan.</p>
+      <p class="nota">Hoy lo único modelado es la cabeza, así que el celular solo deja entrar ahí. Al apagar esa casilla vuelven a aparecer tórax, abdomen y los demás con ilustraciones 2D.</p>
+    </div>
+
+    <div class="card">
+      <h2>EVOLUCIÓN DEL PACIENTE</h2>
+      <div class="dato"><span>Fuente de datos</span><span class="v" id="fuente">—</span></div>
+      <div class="aviso-real" id="avisoReal">El lector está leyendo la pantalla real del simulador: la evolución la marca el profesor desde LLEAP y estos controles quedan desactivados.</div>
+      <div class="fila" style="margin-top:12px">
+        <span style="color:var(--texto-2);font-size:14px">Intensidad del cuadro</span>
+        <span class="v" id="intTxt" style="margin-left:auto">0%</span>
+      </div>
+      <input type="range" id="intensidad" min="0" max="100" value="0">
+      <div class="fila" style="margin-top:12px">
+        <button id="btnEmpeorar">Progresión automática</button>
+        <button id="btnMejorar">Simular mejoría (naloxona)</button>
+      </div>
+      <div class="fila">
+        <span style="color:var(--texto-2);font-size:14px">Duración de la progresión</span>
+        <input type="number" id="rampa" min="0.5" max="30" step="0.5" value="3" style="width:90px"> <span style="color:var(--texto-2);font-size:14px">min</span>
+      </div>
+      <div class="mini" id="mini"></div>
+      <p class="nota">En modo demo, esto reemplaza lo que haría el profesor en el software del simulador.</p>
+    </div>
+
+    <div class="card">
+      <h2>CELULAR DEL ESTUDIANTE</h2>
+      <div class="fila" style="align-items:flex-start;gap:16px">
+        <div class="qr" id="qr"></div>
+        <div style="flex:1">
+          <div class="dato"><span>Control remoto</span><span class="v" id="ctl">—</span></div>
+          <p class="nota">El celular debe estar en la misma red que este computador. Si hay varias, elijan cuál va en el código QR:</p>
+          <div class="urls" id="urls"></div>
+          <div class="fila" style="margin-top:12px"><button id="btnSoltar">Liberar control</button></div>
+          <div class="ayuda-red">
+            <b>¿El celular escanea y no carga?</b> No es el prototipo: el wifi de la universidad no deja
+            que dos aparatos se vean entre sí. Hay que armar una red aparte solo para la prueba
+            (el celular <u>no necesita internet</u>, solo ver este computador):
+            <ol class="pasos-red">
+              <li><b>Plan A:</b> doble clic en <code>PUNTO_DE_ACCESO.bat</code> (carpeta del prototipo).
+                  Prende el punto de acceso de Windows y muestra la clave. Conecten el celular a esa red.</li>
+              <li><b>Plan B,</b> si el computador no deja: prendan el <b>hotspot de un celular</b> y conecten
+                  este computador a esa red. No gasta datos.</li>
+              <li>Vuelvan a esta lista: la dirección nueva (<code>192.168.137.x</code> o
+                  <code>192.168.43.x</code>) aparece sola. Selecciónenla y el QR del televisor cambia solo,
+                  sin reiniciar el caso.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>REGISTRO DE LA SESIÓN</h2>
+      <div class="fila">
+        <input type="text" id="nota" placeholder="Observación (ej. dudó antes de tocar Tórax)" style="flex:1">
+        <button id="btnNota">Anotar</button>
+      </div>
+      <div class="registro" id="registro"></div>
+      <div class="fila" style="margin-top:12px">
+        <a href="/api/registro" id="descargar"><button>Descargar registro (.jsonl)</button></a>
+        <a href="/monitor" target="_blank"><button>Abrir monitor</button></a>
+      </div>
+    </div>
+  </div>
+
+<script src="/static/qrcode.js"></script>
+<script src="/static/comun.js"></script>
+<script>
+const { conectar, enviar, reloj, escapar, qrSVG } = SimClin;
+const $ = (id) => document.getElementById(id);
+const accion = (a, v) => enviar("/api/facilitador", { accion: a, valor: v });
+let e = null, arrastrando = false;
+
+$("btnIniciar").onclick = () => accion("iniciar");
+$("btnPausar").onclick = () => accion("pausar");
+$("btnReiniciar").onclick = () => { if (confirm("¿Reiniciar el caso? Se empieza una sesión nueva de registro.")) accion("reiniciar"); };
+$("escenario").onchange = (ev) => accion("escenario", ev.target.value);
+$("btnEmpeorar").onclick = () => accion("empeorar");
+$("btnMejorar").onclick = () => accion("mejorar");
+$("rampa").onchange = (ev) => accion("rampa", parseFloat(ev.target.value) * 60);
+$("mostrarDx").onchange = (ev) => accion("mostrar_dx", ev.target.checked);
+$("mostrarConteos").onchange = (ev) => accion("mostrar_conteos", ev.target.checked);
+$("soloModelados").onchange = (ev) => accion("solo_modelados", ev.target.checked);
+$("btnSoltar").onclick = () => accion("soltar_control");
+$("btnNota").onclick = () => { const t = $("nota").value.trim(); if (t) { accion("nota", t); $("nota").value = ""; cargarRegistro(); } };
+$("nota").onkeydown = (ev) => { if (ev.key === "Enter") $("btnNota").click(); };
+const r = $("intensidad");
+r.oninput = () => { arrastrando = true; $("intTxt").textContent = r.value + "%"; };
+r.onchange = () => { accion("intensidad", r.value / 100); arrastrando = false; };
+
+function render(s) {
+  e = s;
+  const sel = $("escenario");
+  if (!sel.options.length) {
+    sel.innerHTML = s.escenarios_disponibles.map((x) => `<option value="${x.id}">${x.codigo} · ${escapar(x.diagnostico)}</option>`).join("");
+  }
+  sel.value = s.escenario;
+  $("tiempo").textContent = reloj(s.transcurrido_s) + (s.corriendo ? "" : s.iniciado ? " (pausado)" : "");
+  const cls = { "CRÍTICO": "crit", "ALERTA": "warn", "ESTABLE": "ok" }[s.estado_paciente] || "";
+  $("estadoPac").className = "v " + cls; $("estadoPac").textContent = s.estado_paciente;
+  const sis = s.sistemas.find((x) => x.id === s.sistema_seleccionado);
+  $("sistema").textContent = sis ? sis.nombre : "Vista general";
+  $("btnIniciar").textContent = s.iniciado ? "Reanudar" : "Iniciar caso";
+  $("btnIniciar").disabled = s.corriendo;
+  $("btnPausar").disabled = !s.corriendo;
+  $("mostrarDx").checked = s.mostrar_dx;
+  $("mostrarConteos").checked = s.mostrar_conteos;
+  $("soloModelados").checked = s.solo_modelados !== false;
+
+  $("fuente").className = "v " + (s.datos_reales ? "ok" : "warn");
+  $("fuente").textContent = s.datos_reales ? "LECTOR CONECTADO (REAL)" : "MODO DEMO";
+  $("avisoReal").classList.toggle("si", s.datos_reales);
+  for (const id of ["intensidad", "btnEmpeorar", "btnMejorar"]) $(id).disabled = s.datos_reales;
+  if (!arrastrando) { r.value = Math.round(s.intensidad * 100); $("intTxt").textContent = r.value + "%"; }
+
+  $("mini").innerHTML = ["fc", "ta", "spo2", "fr", "etco2", "temp"].map((k) => {
+    const v = s.vitales[k];
+    return `<div><small>${v.nombre} ${v.origen === "real" ? "· REAL" : ""}</small><b class="${v.severidad}">${v.texto}</b></div>`;
+  }).join("");
+
+  $("ctl").className = "v " + (s.controlador ? "ok" : "warn");
+  $("ctl").textContent = s.controlador ? "CONECTADO" : "SIN CELULAR";
+  const urls = (s.urls && s.urls.control) || [];
+  const elegida = s.url_control || urls[0];
+  const txt = urls.join("\n") + "|" + elegida;
+  if ($("urls").dataset.t !== txt) {
+    $("urls").dataset.t = txt;
+    $("urls").innerHTML = urls.map((u) => `
+      <label class="opcion-url">
+        <input type="radio" name="urlctl" value="${escapar(u)}" ${u === elegida ? "checked" : ""}>
+        <span>${escapar(u)}<span class="et">${etiquetaRed(u)}</span></span>
+      </label>`).join("") || "<div>Sin red detectada</div>";
+    $("urls").querySelectorAll("input").forEach((i) => (i.onchange = () => accion("url_control", i.value)));
+    $("qr").innerHTML = elegida ? qrSVG(elegida, 170) : "";
+  }
+}
+
+// Pista de qué red es cada dirección, para no tener que adivinar
+function etiquetaRed(url) {
+  const ip = (url.match(/\/\/([0-9.]+):/) || [])[1] || "";
+  if (ip.startsWith("192.168.137.")) return "punto de acceso de Windows (esta es la buena si lo prendieron)";
+  if (ip.startsWith("192.168.")) return "wifi o router local";
+  if (ip.startsWith("10.")) return "red institucional (suele bloquear el celular)";
+  if (ip.startsWith("172.")) return "red institucional o virtual";
+  if (ip.startsWith("169.254.")) return "sin conexión real, no sirve";
+  return "";
+}
+
+const NOMBRES = { caso_iniciado: "Caso iniciado", sistema_abierto: "Abrió", vista_general: "Volvió a vista general",
+  control_tomado: "Celular tomó el control", pausado: "Pausa", reanudado: "En curso", intensidad_manual: "Intensidad",
+  simular_mejoria: "Mejoría simulada", progresion_automatica: "Progresión automática", nota: "Nota",
+  lector_conectado: "Lector conectado", escenario: "Escenario", sesion_nueva: "Sesión nueva", reiniciado: "Reinicio",
+  control_liberado: "Control liberado", mostrar_conteos: "Conteos en celular", url_control: "Dirección del QR",
+  solo_modelados: "Solo sistemas modelados" };
+async function cargarRegistro() {
+  try {
+    const t = await (await fetch("/api/registro", { cache: "no-store" })).text();
+    const filas = t.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).reverse().slice(0, 60);
+    $("registro").innerHTML = filas.map((f) => {
+      const extra = f.sistema ? f.sistema : f.texto ? `"${escapar(f.texto)}"` : f.valor !== undefined ? f.valor : f.escenario || "";
+      return `<div>${f.hora.slice(11, 19)} · T+${reloj(f.t_caso_s)} · <b>${NOMBRES[f.evento] || f.evento}</b> ${extra}</div>`;
+    }).join("") || "<div>Aún no hay eventos.</div>";
+  } catch (err) {}
+}
+setInterval(cargarRegistro, 2000); cargarRegistro();
+
+conectar("facilitador", null, render);
+</script>
+</body>
+</html>

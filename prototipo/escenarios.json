@@ -1,0 +1,939 @@
+{
+  "_nota": "Valores clinicos de PRUEBA para el prototipo. Deben ser revisados y validados por el profesor de toxicologia antes de usarse con estudiantes como contenido definitivo. Cada hallazgo tiene 'etapas': [intensidad_desde, texto, severidad]. La intensidad va de 0 (paciente estable) a 1 (cuadro maximo). Severidades: ok, warn, crit, ref (ref = se evalua en el maniqui fisico, no en la app).",
+  "signos_vitales": {
+    "fc": {
+      "nombre": "FC",
+      "unidad": "lpm",
+      "warn": [
+        60,
+        100
+      ],
+      "crit": [
+        50,
+        130
+      ]
+    },
+    "ta": {
+      "nombre": "TA",
+      "unidad": "mmHg",
+      "warn": [
+        100,
+        140
+      ],
+      "crit": [
+        90,
+        180
+      ]
+    },
+    "spo2": {
+      "nombre": "SpO₂",
+      "unidad": "%",
+      "warn": [
+        94,
+        101
+      ],
+      "crit": [
+        88,
+        101
+      ]
+    },
+    "fr": {
+      "nombre": "FR",
+      "unidad": "rpm",
+      "warn": [
+        12,
+        20
+      ],
+      "crit": [
+        8,
+        30
+      ]
+    },
+    "etco2": {
+      "nombre": "EtCO₂",
+      "unidad": "mmHg",
+      "warn": [
+        35,
+        45
+      ],
+      "crit": [
+        25,
+        55
+      ]
+    },
+    "temp": {
+      "nombre": "T°",
+      "unidad": "°C",
+      "warn": [
+        36,
+        38
+      ],
+      "crit": [
+        35,
+        39
+      ],
+      "decimales": 1
+    }
+  },
+  "sistemas": [
+    {
+      "id": "cabeza",
+      "nombre": "Cabeza y Cuello",
+      "icono": "cabeza",
+      "modelo3d": true,
+      "subvistas": [
+        {
+          "id": "cara",
+          "nombre": "Cara completa"
+        },
+        {
+          "id": "labios",
+          "nombre": "Labios / boca"
+        },
+        {
+          "id": "ojos",
+          "nombre": "Ojos / pupilas"
+        }
+      ]
+    },
+    {
+      "id": "torax",
+      "nombre": "Tórax / Respiratorio",
+      "icono": "pulmones"
+    },
+    {
+      "id": "cardio",
+      "nombre": "Cardiovascular",
+      "icono": "corazon"
+    },
+    {
+      "id": "abdomen",
+      "nombre": "Abdomen / GI",
+      "icono": "abdomen"
+    },
+    {
+      "id": "extremidades",
+      "nombre": "Extremidades",
+      "icono": "mano"
+    },
+    {
+      "id": "neuro",
+      "nombre": "Neurológico",
+      "icono": "cerebro"
+    }
+  ],
+  "escenarios": {
+    "heroina": {
+      "codigo": "Caso A",
+      "diagnostico": "Sobredosis de opioides (heroína)",
+      "paciente": "M, 27 a · 74 kg",
+      "motivo": "Encontrado inconsciente en la vía pública",
+      "intensidad_desde_dato_real": {
+        "signo": "fr",
+        "estable": 16,
+        "maximo": 6
+      },
+      "vitales": {
+        "fc": [
+          88,
+          50
+        ],
+        "ta": [
+          [
+            118,
+            76
+          ],
+          [
+            88,
+            54
+          ]
+        ],
+        "spo2": [
+          97,
+          80
+        ],
+        "fr": [
+          16,
+          6
+        ],
+        "etco2": [
+          38,
+          62
+        ],
+        "temp": [
+          36.6,
+          35.6
+        ]
+      },
+      "visual": {
+        "pupila_mm": [
+          4.0,
+          1.0
+        ],
+        "cianosis": [
+          0.0,
+          1.0
+        ],
+        "palidez": [
+          0.0,
+          0.6
+        ],
+        "sudor": [
+          0.0,
+          0.0
+        ],
+        "temblor": [
+          0.0,
+          0.0
+        ],
+        "parpados": [
+          0.0,
+          0.6
+        ],
+        "marcas": [
+          1.0,
+          1.0
+        ]
+      },
+      "hallazgos": {
+        "cabeza": [
+          {
+            "nombre": "Pupilas",
+            "etapas": [
+              [
+                0,
+                "Normales, 4 mm, reactivas",
+                "ok"
+              ],
+              [
+                0.35,
+                "Mióticas, 2 mm",
+                "warn"
+              ],
+              [
+                0.65,
+                "Puntiformes, 1 mm",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Labios",
+            "etapas": [
+              [
+                0,
+                "Rosados",
+                "ok"
+              ],
+              [
+                0.4,
+                "Violáceos",
+                "warn"
+              ],
+              [
+                0.7,
+                "Cianosis marcada",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Piel facial",
+            "etapas": [
+              [
+                0,
+                "Normal",
+                "ok"
+              ],
+              [
+                0.5,
+                "Pálida y fría",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Vía aérea",
+            "etapas": [
+              [
+                0,
+                "Permeable",
+                "ok"
+              ],
+              [
+                0.6,
+                "Ronquido, riesgo de obstrucción",
+                "crit"
+              ]
+            ]
+          }
+        ],
+        "torax": [
+          {
+            "nombre": "Frecuencia respiratoria",
+            "signo": "fr"
+          },
+          {
+            "nombre": "Saturación",
+            "signo": "spo2"
+          },
+          {
+            "nombre": "EtCO₂",
+            "signo": "etco2"
+          },
+          {
+            "nombre": "Patrón respiratorio",
+            "etapas": [
+              [
+                0,
+                "Normal",
+                "ok"
+              ],
+              [
+                0.3,
+                "Superficial",
+                "warn"
+              ],
+              [
+                0.65,
+                "Bradipnea con pausas",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Auscultación pulmonar",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          }
+        ],
+        "cardio": [
+          {
+            "nombre": "Frecuencia cardíaca",
+            "signo": "fc"
+          },
+          {
+            "nombre": "Tensión arterial",
+            "signo": "ta"
+          },
+          {
+            "nombre": "Ritmo",
+            "etapas": [
+              [
+                0,
+                "Sinusal",
+                "ok"
+              ],
+              [
+                0.6,
+                "Bradicardia sinusal",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Llenado capilar",
+            "etapas": [
+              [
+                0,
+                "Menor a 2 s",
+                "ok"
+              ],
+              [
+                0.5,
+                "3 s",
+                "warn"
+              ],
+              [
+                0.8,
+                "Mayor a 4 s",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Ruidos cardíacos",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          }
+        ],
+        "abdomen": [
+          {
+            "nombre": "Ruidos intestinales",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          },
+          {
+            "nombre": "Distensión",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ]
+            ]
+          },
+          {
+            "nombre": "Globo vesical",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ],
+              [
+                0.6,
+                "Retención urinaria",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Náusea / vómito",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ],
+              [
+                0.5,
+                "Náusea",
+                "warn"
+              ]
+            ]
+          }
+        ],
+        "extremidades": [
+          {
+            "nombre": "Temperatura distal",
+            "etapas": [
+              [
+                0,
+                "Tibia",
+                "ok"
+              ],
+              [
+                0.5,
+                "Fría",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Coloración ungueal",
+            "etapas": [
+              [
+                0,
+                "Rosada",
+                "ok"
+              ],
+              [
+                0.6,
+                "Cianosis distal",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Brazos",
+            "etapas": [
+              [
+                0,
+                "Marcas de venopunción en fosa antecubital",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Tono muscular",
+            "etapas": [
+              [
+                0,
+                "Normal",
+                "ok"
+              ],
+              [
+                0.5,
+                "Hipotonía",
+                "warn"
+              ]
+            ]
+          }
+        ],
+        "neuro": [
+          {
+            "nombre": "Glasgow",
+            "etapas": [
+              [
+                0,
+                "15 / 15",
+                "ok"
+              ],
+              [
+                0.3,
+                "13 / 15",
+                "warn"
+              ],
+              [
+                0.55,
+                "10 / 15",
+                "warn"
+              ],
+              [
+                0.75,
+                "7 / 15",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Estado de conciencia",
+            "etapas": [
+              [
+                0,
+                "Alerta",
+                "ok"
+              ],
+              [
+                0.3,
+                "Somnoliento",
+                "warn"
+              ],
+              [
+                0.6,
+                "Estupor",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Temperatura",
+            "signo": "temp"
+          },
+          {
+            "nombre": "Convulsiones",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "tramadol": {
+      "codigo": "Caso B",
+      "diagnostico": "Intoxicación por tramadol",
+      "paciente": "F, 34 a · 61 kg",
+      "motivo": "Traída por familiares, agitada y sudorosa",
+      "intensidad_desde_dato_real": {
+        "signo": "fc",
+        "estable": 88,
+        "maximo": 128
+      },
+      "vitales": {
+        "fc": [
+          88,
+          128
+        ],
+        "ta": [
+          [
+            118,
+            76
+          ],
+          [
+            152,
+            94
+          ]
+        ],
+        "spo2": [
+          97,
+          91
+        ],
+        "fr": [
+          16,
+          20
+        ],
+        "etco2": [
+          38,
+          34
+        ],
+        "temp": [
+          36.6,
+          38.2
+        ]
+      },
+      "visual": {
+        "pupila_mm": [
+          4.0,
+          6.0
+        ],
+        "cianosis": [
+          0.0,
+          0.15
+        ],
+        "palidez": [
+          0.0,
+          0.0
+        ],
+        "sudor": [
+          0.0,
+          1.0
+        ],
+        "temblor": [
+          0.0,
+          1.0
+        ],
+        "parpados": [
+          0.0,
+          0.0
+        ],
+        "marcas": [
+          0.0,
+          0.0
+        ]
+      },
+      "hallazgos": {
+        "cabeza": [
+          {
+            "nombre": "Pupilas",
+            "etapas": [
+              [
+                0,
+                "Normales, 4 mm, reactivas",
+                "ok"
+              ],
+              [
+                0.6,
+                "Levemente dilatadas, 6 mm",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Piel facial",
+            "etapas": [
+              [
+                0,
+                "Normal",
+                "ok"
+              ],
+              [
+                0.35,
+                "Diaforesis",
+                "warn"
+              ],
+              [
+                0.7,
+                "Diaforesis profusa",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Labios",
+            "etapas": [
+              [
+                0,
+                "Rosados",
+                "ok"
+              ],
+              [
+                0.85,
+                "Levemente violáceos",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Vía aérea",
+            "etapas": [
+              [
+                0,
+                "Permeable",
+                "ok"
+              ],
+              [
+                0.8,
+                "En riesgo por convulsión",
+                "crit"
+              ]
+            ]
+          }
+        ],
+        "torax": [
+          {
+            "nombre": "Frecuencia respiratoria",
+            "signo": "fr"
+          },
+          {
+            "nombre": "Saturación",
+            "signo": "spo2"
+          },
+          {
+            "nombre": "EtCO₂",
+            "signo": "etco2"
+          },
+          {
+            "nombre": "Patrón respiratorio",
+            "etapas": [
+              [
+                0,
+                "Normal",
+                "ok"
+              ],
+              [
+                0.4,
+                "Taquipnea leve",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Auscultación pulmonar",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          }
+        ],
+        "cardio": [
+          {
+            "nombre": "Frecuencia cardíaca",
+            "signo": "fc"
+          },
+          {
+            "nombre": "Tensión arterial",
+            "signo": "ta"
+          },
+          {
+            "nombre": "Ritmo",
+            "etapas": [
+              [
+                0,
+                "Sinusal",
+                "ok"
+              ],
+              [
+                0.4,
+                "Taquicardia sinusal",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Llenado capilar",
+            "etapas": [
+              [
+                0,
+                "Menor a 2 s",
+                "ok"
+              ]
+            ]
+          },
+          {
+            "nombre": "Ruidos cardíacos",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          }
+        ],
+        "abdomen": [
+          {
+            "nombre": "Ruidos intestinales",
+            "etapas": [
+              [
+                0,
+                "Auscultar en el maniquí",
+                "ref"
+              ]
+            ]
+          },
+          {
+            "nombre": "Distensión",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ]
+            ]
+          },
+          {
+            "nombre": "Náusea / vómito",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ],
+              [
+                0.3,
+                "Náusea y vómito",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Dolor abdominal",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ]
+            ]
+          }
+        ],
+        "extremidades": [
+          {
+            "nombre": "Temperatura distal",
+            "etapas": [
+              [
+                0,
+                "Tibia",
+                "ok"
+              ],
+              [
+                0.4,
+                "Caliente y sudorosa",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Temblor",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ],
+              [
+                0.35,
+                "Temblor fino",
+                "warn"
+              ],
+              [
+                0.7,
+                "Mioclonías",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Reflejos",
+            "etapas": [
+              [
+                0,
+                "Normales",
+                "ok"
+              ],
+              [
+                0.5,
+                "Hiperreflexia",
+                "warn"
+              ]
+            ]
+          },
+          {
+            "nombre": "Coloración ungueal",
+            "etapas": [
+              [
+                0,
+                "Rosada",
+                "ok"
+              ]
+            ]
+          }
+        ],
+        "neuro": [
+          {
+            "nombre": "Glasgow",
+            "etapas": [
+              [
+                0,
+                "15 / 15",
+                "ok"
+              ],
+              [
+                0.6,
+                "14 / 15",
+                "warn"
+              ],
+              [
+                0.85,
+                "9 / 15",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Estado de conciencia",
+            "etapas": [
+              [
+                0,
+                "Alerta",
+                "ok"
+              ],
+              [
+                0.3,
+                "Ansiosa, agitada",
+                "warn"
+              ],
+              [
+                0.85,
+                "Crisis convulsiva",
+                "crit"
+              ]
+            ]
+          },
+          {
+            "nombre": "Temperatura",
+            "signo": "temp"
+          },
+          {
+            "nombre": "Convulsiones",
+            "etapas": [
+              [
+                0,
+                "No",
+                "ok"
+              ],
+              [
+                0.85,
+                "Tónico-clónica activa",
+                "crit"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
