@@ -119,7 +119,9 @@ export function crearVisor(contenedor) {
       const hit = rc.intersectObject(raiz, true)[0];
       if (!hit) continue;
       const g = new THREE.Mesh(geo, mat.clone());
-      const escala = 0.006 + Math.random() * 0.004;
+      // Pequeñas a propósito: el visor ahora ocupa todo el panel y unas gotas
+      // grandes se leen como balines pegados en la cara.
+      const escala = 0.0032 + Math.random() * 0.0022;
       g.scale.setScalar(escala);
       g.position.copy(hit.point).addScaledVector(hit.face.normal, escala * 0.55);
       g.userData = { yInicial: g.position.y, fase: Math.random() * 3 };
@@ -171,7 +173,7 @@ export function crearVisor(contenedor) {
     uniformes.uPalidez.value = visual.palidez || 0;
     const sudor = visual.sudor || 0;
     material.roughness = 0.62 - sudor * 0.30;   // piel más brillante = sudorosa
-    for (const g of gotas) g.material.opacity = sudor * 0.85;
+    for (const g of gotas) g.material.opacity = sudor * 0.6;
   }
 
   function ajustarTamano() {

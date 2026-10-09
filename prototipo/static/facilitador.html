@@ -51,6 +51,30 @@
   .mini div { background: #0b1522; border: 1px solid var(--borde); border-radius: 10px; padding: 8px 10px; }
   .mini small { display: block; color: var(--texto-3); font-family: var(--mono); font-size: 11px; }
   .mini b { font-family: var(--mono); font-size: 20px; }
+  .sep-pup { border-top: 1px dashed var(--borde); margin: 16px 0 12px; }
+  button.chico { font-size: 12.5px; padding: 5px 11px; }
+  .manuales { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; }
+  .ctrl { background: #0b1522; border: 1px solid var(--borde); border-radius: 10px; padding: 8px 12px 10px; }
+  .ctrl.manual { border-color: var(--warn); }
+  .ctrl .cab { display: flex; align-items: center; gap: 10px; }
+  .ctrl .nom { font-size: 14px; color: var(--texto-2); }
+  .ctrl .val { margin-left: auto; font-family: var(--mono); font-size: 14px; color: var(--texto-3); }
+  .ctrl.manual .val { color: var(--warn); }
+  .ctrl .auto { font-size: 11.5px; padding: 3px 8px; visibility: hidden; }
+  .ctrl.manual .auto { visibility: visible; }
+  .ctrl input[type=range] { margin: 4px 0 0; }
+  .ctrl .donde { font-family: var(--mono); font-size: 10px; letter-spacing: .05em; color: var(--texto-3); }
+  .hall { display: flex; flex-direction: column; gap: 6px; }
+  .hall .sis { font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em; color: var(--texto-3); margin-top: 10px; }
+  .hall .sis:first-child { margin-top: 0; }
+  .hall .h { display: flex; gap: 10px; align-items: baseline; background: #0b1522; border: 1px solid var(--borde);
+    border-left-width: 4px; border-radius: 8px; padding: 7px 11px; }
+  .hall .h .n { color: var(--texto-2); font-size: 13.5px; min-width: 150px; }
+  .hall .h .v { font-size: 14.5px; font-weight: 600; }
+  .hall .h.crit { border-left-color: var(--crit); } .hall .h.crit .v { color: var(--crit); }
+  .hall .h.warn { border-left-color: var(--warn); } .hall .h.warn .v { color: var(--warn); }
+  .hall .h.ok   { border-left-color: var(--ok); }
+  .hall .h.ref  { border-left-color: var(--cian); } .hall .h.ref .v { color: var(--cian); }
 </style>
 </head>
 <body>
@@ -95,8 +119,25 @@
         <span style="color:var(--texto-2);font-size:14px">Duración de la progresión</span>
         <input type="number" id="rampa" min="0.5" max="30" step="0.5" value="3" style="width:90px"> <span style="color:var(--texto-2);font-size:14px">min</span>
       </div>
+      <div class="sep-pup"></div>
+      <div class="fila">
+        <span style="color:var(--texto-2);font-size:14px;font-weight:600">Signos físicos a mano</span>
+        <button id="btnTodoAuto" class="chico" style="margin-left:auto">Todo en automático</button>
+      </div>
+      <div class="manuales" id="manuales"></div>
+      <p class="nota">Cada uno manda sobre el escenario y sobre el deslizador de intensidad. Sirven también con el
+        lector conectado, porque el monitor real no reporta nada de esto. Al reiniciar vuelven a automático.</p>
+
       <div class="mini" id="mini"></div>
       <p class="nota">En modo demo, esto reemplaza lo que haría el profesor en el software del simulador.</p>
+    </div>
+
+    <div class="card">
+      <h2>LO QUE DEBERÍA ESTAR VIENDO EL ESTUDIANTE</h2>
+      <p class="nota" style="margin-top:0">El televisor ya no escribe los hallazgos: nombrarlos le regala el
+        diagnóstico al grupo. Quedan acá, para que ustedes sepan qué hay en pantalla y puedan anotar si lo
+        mencionaron o se les pasó.</p>
+      <div class="hall" id="hall"></div>
     </div>
 
     <div class="card">
@@ -165,6 +206,64 @@ const r = $("intensidad");
 r.oninput = () => { arrastrando = true; $("intTxt").textContent = r.value + "%"; };
 r.onchange = () => { accion("intensidad", r.value / 100); arrastrando = false; };
 
+/* Signos físicos a mano.
+ * Son exactamente los siete parámetros visuales que el escenario ya calcula.
+ * El deslizador trabaja en enteros: para la pupila, décimas de milímetro;
+ * para el resto, porcentaje. "donde" dice en qué vista se nota cada uno, para
+ * que nadie mueva un control y crea que no funciona.
+ */
+const CONTROLES = [
+  { id: "pupila_mm", nom: "Pupilas",   min: 8, max: 90, k: 10,  fmt: (v) => v.toFixed(1).replace(".", ",") + " mm",
+    donde: "ojos en 3D" },
+  { id: "cianosis",  nom: "Cianosis",  min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "labios y piel · cara 3D y 2D" },
+  { id: "palidez",   nom: "Palidez",   min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "piel · cara 3D y 2D" },
+  { id: "sudor",     nom: "Sudoración", min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "gotas y brillo · cara 3D, mano 2D" },
+  { id: "temblor",   nom: "Temblor",   min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "solo extremidades (2D)" },
+  { id: "parpados",  nom: "Párpados caídos", min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "solo cara 2D" },
+  { id: "marcas",    nom: "Marcas de venopunción", min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
+    donde: "solo extremidades (2D)" },
+];
+const arrastrandoVis = {};
+
+$("manuales").innerHTML = CONTROLES.map((c) => `
+  <div class="ctrl" id="ctrl_${c.id}">
+    <div class="cab">
+      <span class="nom">${escapar(c.nom)}</span>
+      <span class="val" id="val_${c.id}">auto</span>
+      <button class="auto chico" data-auto="${c.id}">auto</button>
+    </div>
+    <input type="range" id="rng_${c.id}" min="${c.min}" max="${c.max}" step="1" value="${c.min}">
+    <div class="donde">${escapar(c.donde)}</div>
+  </div>`).join("");
+
+for (const c of CONTROLES) {
+  const r2 = $("rng_" + c.id);
+  r2.oninput = () => {
+    arrastrandoVis[c.id] = true;
+    $("ctrl_" + c.id).classList.add("manual");
+    $("val_" + c.id).textContent = c.fmt(r2.value / c.k);
+  };
+  r2.onchange = () => {
+    accion("visual_manual", { nombre: c.id, valor: r2.value / c.k });
+    arrastrandoVis[c.id] = false;
+  };
+}
+$("manuales").querySelectorAll("[data-auto]").forEach((b) => {
+  b.onclick = () => {
+    arrastrandoVis[b.dataset.auto] = false;
+    accion("visual_manual", { nombre: b.dataset.auto, valor: null });
+  };
+});
+$("btnTodoAuto").onclick = () => {
+  for (const c of CONTROLES) arrastrandoVis[c.id] = false;
+  accion("visual_todo_auto");
+};
+
 function render(s) {
   e = s;
   const sel = $("escenario");
@@ -190,9 +289,37 @@ function render(s) {
   for (const id of ["intensidad", "btnEmpeorar", "btnMejorar"]) $(id).disabled = s.datos_reales;
   if (!arrastrando) { r.value = Math.round(s.intensidad * 100); $("intTxt").textContent = r.value + "%"; }
 
+  const enManual = s.visual_manual || {};
+  let algunoManual = false;
+  for (const c of CONTROLES) {
+    const manual = c.id in enManual;
+    if (manual) algunoManual = true;
+    if (arrastrandoVis[c.id]) continue;
+    const actual = (s.visual && s.visual[c.id] != null) ? s.visual[c.id] : c.min / c.k;
+    $("rng_" + c.id).value = Math.round(Math.min(Math.max(actual * c.k, c.min), c.max));
+    $("ctrl_" + c.id).classList.toggle("manual", manual);
+    $("val_" + c.id).textContent = (manual ? "" : "auto · ") + c.fmt(actual);
+  }
+  $("btnTodoAuto").disabled = !algunoManual;
+
   $("mini").innerHTML = ["fc", "ta", "spo2", "fr", "etco2", "temp"].map((k) => {
     const v = s.vitales[k];
     return `<div><small>${v.nombre} ${v.origen === "real" ? "· REAL" : ""}</small><b class="${v.severidad}">${v.texto}</b></div>`;
+  }).join("");
+
+  // Hallazgos: los del sistema que está en el televisor; si están en vista
+  // general, los de todos los sistemas a los que el celular puede entrar.
+  const visibles = s.sistemas.filter((x) => x.disponible !== false);
+  const aMostrar = sis ? [sis] : visibles;
+  $("hall").innerHTML = aMostrar.map((x) => {
+    const filas = (x.hallazgos || []).map((h) => `
+      <div class="h ${h.severidad}">
+        <span class="n">${escapar(h.nombre)}</span>
+        <span class="v">${escapar(h.texto)}</span>
+        ${h.severidad === "ref" ? '<span class="n" style="margin-left:auto;min-width:0">en el maniquí</span>'
+          : h.origen === "real" ? '<span class="n" style="margin-left:auto;min-width:0">REAL</span>' : ""}
+      </div>`).join("");
+    return aMostrar.length > 1 ? `<div class="sis">${escapar(x.nombre).toUpperCase()}</div>${filas}` : filas;
   }).join("");
 
   $("ctl").className = "v " + (s.controlador ? "ok" : "warn");
@@ -228,7 +355,9 @@ const NOMBRES = { caso_iniciado: "Caso iniciado", sistema_abierto: "Abrió", vis
   simular_mejoria: "Mejoría simulada", progresion_automatica: "Progresión automática", nota: "Nota",
   lector_conectado: "Lector conectado", escenario: "Escenario", sesion_nueva: "Sesión nueva", reiniciado: "Reinicio",
   control_liberado: "Control liberado", mostrar_conteos: "Conteos en celular", url_control: "Dirección del QR",
-  solo_modelados: "Solo sistemas modelados" };
+  solo_modelados: "Solo sistemas modelados",
+  visual_manual: "Signo a mano", visual_auto: "Signo en automático",
+  visual_todo_auto: "Todo en automático" };
 async function cargarRegistro() {
   try {
     const t = await (await fetch("/api/registro", { cache: "no-store" })).text();

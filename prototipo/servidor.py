@@ -118,6 +118,9 @@ class Estado:
         self.rampa_s = 180.0
         self.sistema = None
         self.subvista = None
+        # Parámetros visuales que el profesor fijó a mano (nombre -> valor).
+        # Se sueltan al reiniciar: cada grupo empieza con el escenario tal cual.
+        self.visual_manual = {}
         self.sesion_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.archivo_registro = REGISTROS / f"sesion_{self.sesion_id}.jsonl"
 
@@ -179,6 +182,11 @@ class Estado:
                               "severidad": severidad_vital(clave, valor), "origen": origen}
 
         visual = {n: round(lerp(a, b, k), 3) for n, (a, b) in esc["visual"].items()}
+        # El profesor puede fijar cualquiera de estos signos a mano y mandar
+        # sobre el escenario, como lo haría desde el software del simulador.
+        for nombre, v in self.visual_manual.items():
+            if nombre in visual:
+                visual[nombre] = round(v, 3)
 
         sistemas = []
         total_crit = total_warn = 0
@@ -196,6 +204,13 @@ class Estado:
             warn = sum(1 for i in items if i["severidad"] == "warn")
             total_crit += crit
             total_warn += warn
+            # Con la pupila en manual, el hallazgo escrito tiene que decir lo
+            # mismo que se ve, o el panel del facilitador miente.
+            if "pupila_mm" in self.visual_manual:
+                for i in items:
+                    if i["nombre"].lower().startswith("pupila"):
+                        i["texto"] = texto_pupila(visual["pupila_mm"])
+                        i["severidad"] = severidad_pupila(visual["pupila_mm"])
             disponible = (not self.solo_modelados) or bool(s.get("modelo3d"))
             sistemas.append({**s, "hallazgos": items, "criticos": crit, "alertas": warn,
                              "disponible": disponible})
@@ -222,6 +237,8 @@ class Estado:
             "mostrar_dx": self.mostrar_dx,
             "mostrar_conteos": self.mostrar_conteos,
             "solo_modelados": self.solo_modelados,
+            "visual_manual": dict(self.visual_manual),
+            "visual_rango": LIMITES_VISUAL,
             "iniciado": self.iniciado,
             "corriendo": self.corriendo,
             "transcurrido_s": round(self.transcurrido(), 1),
@@ -309,6 +326,41 @@ def ips_urls():
     """Se recalcula en cada consulta: si prenden el hotspot con el servidor ya
     arrancado, la dirección nueva aparece sola en el panel."""
     return [f"http://{ip}:{PUERTO}/control" for ip in ips_locales()]
+
+
+# Lo único que el profesor puede mover a mano son estos siete parámetros, que
+# son exactamente los que el escenario ya calcula y las vistas ya dibujan.
+LIMITES_VISUAL = {
+    "pupila_mm": [0.8, 9.0],
+    "cianosis": [0.0, 1.0],
+    "palidez": [0.0, 1.0],
+    "sudor": [0.0, 1.0],
+    "temblor": [0.0, 1.0],
+    "parpados": [0.0, 1.0],
+    "marcas": [0.0, 1.0],
+}
+
+
+def texto_pupila(mm):
+    if mm <= 2.0:
+        nombre = "Puntiformes"
+    elif mm < 3.5:
+        nombre = "Mióticas"
+    elif mm < 5.5:
+        nombre = "Normales"
+    elif mm < 7.0:
+        nombre = "Midriáticas"
+    else:
+        nombre = "Midriasis marcada"
+    return f"{nombre}, {mm:.1f} mm (manual)"
+
+
+def severidad_pupila(mm):
+    if mm <= 2.0 or mm >= 7.0:
+        return "crit"
+    if mm < 3.0 or mm >= 6.0:
+        return "warn"
+    return "ok"
 
 
 def sistema_modelado(sid):
@@ -537,6 +589,24 @@ class Manejador(BaseHTTPRequestHandler):
         elif accion == "mostrar_conteos":
             E.mostrar_conteos = bool(valor)
             E.registrar("mostrar_conteos", valor=bool(valor))
+        elif accion == "visual_manual":
+            # valor = {"nombre": "cianosis", "valor": 0.8}  |  valor null = auto
+            d = valor if isinstance(valor, dict) else {}
+            nombre = d.get("nombre")
+            if nombre not in LIMITES_VISUAL:
+                return self.responder(400, {"error": "parámetro visual desconocido"})
+            v = d.get("valor")
+            if v is None or v == "":
+                E.visual_manual.pop(nombre, None)
+                E.registrar("visual_auto", parametro=nombre)
+            else:
+                lo, hi = LIMITES_VISUAL[nombre]
+                E.visual_manual[nombre] = max(lo, min(hi, float(v)))
+                E.registrar("visual_manual", parametro=nombre,
+                            valor=round(E.visual_manual[nombre], 3))
+        elif accion == "visual_todo_auto":
+            E.visual_manual.clear()
+            E.registrar("visual_todo_auto")
         elif accion == "solo_modelados":
             E.solo_modelados = bool(valor)
             # si se apaga el sistema que estaba abierto, se vuelve a la vista general

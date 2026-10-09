@@ -64,18 +64,22 @@
   .pin { font-family: var(--mono); font-weight: 700; font-size: 13px; }
   .pin circle.anillo { transform-box: fill-box; transform-origin: center; animation: pulso 1.6s ease-out infinite; }
 
-  /* vista de sistema */
-  #vistaSistema { display: grid; grid-template-columns: 500px 1fr; }
-  .sis-izq { padding: 30px 10px 30px 34px; display: flex; flex-direction: column; }
+  /* vista de sistema — sin lista de hallazgos: lo que pasa se mira, no se lee */
+  #vistaSistema { display: block; }
+  .sis-izq { padding: 30px 34px; display: flex; flex-direction: column; height: 100%; }
   .sis-titulo { font-family: var(--mono); font-size: 15px; letter-spacing: .22em; color: var(--cian); display: flex; align-items: center; gap: 12px; }
   .sis-titulo svg { width: 26px; height: 26px; }
   .sis-nombre { font-size: 38px; font-weight: 750; margin: 10px 0 0; }
   .ilustracion { flex: 1; display: flex; align-items: center; justify-content: center; }
-  .ilustracion > svg { width: 440px; height: 520px; overflow: visible; }
-  .visor3d { position: relative; width: 460px; height: 560px; }
+  .ilustracion > svg { width: 620px; height: 700px; overflow: visible; }
+  .visor3d { position: relative; width: 820px; height: 720px; }
   .visor3d canvas { border-radius: 18px; }
   .visor3d .cargando { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 14px; letter-spacing: .14em; color: var(--texto-3); }
   .visor3d[data-estado="listo"] .cargando { display: none; }
+  /* capa de los ojos en 3D: tapa la cabeza cuando se pide la vista de pupilas */
+  .capa-ojos { position: absolute; inset: 0; border-radius: 18px; background: #0a1220; display: none; }
+  .capa-ojos.si { display: block; }
+  .capa-ojos canvas { border-radius: 18px; }
   .esquema-pupila { position: absolute; right: 8px; bottom: 8px; width: 190px; background: rgba(8,16,26,.9); border: 1px solid var(--borde-2); border-radius: 14px; padding: 12px 14px; }
   .esquema-pupila svg { width: 100%; height: 62px; display: block; }
   .esquema-pupila .txt { font-family: var(--mono); font-size: 10.5px; line-height: 1.45; color: var(--texto-3); margin-top: 8px; letter-spacing: .04em; }
@@ -205,7 +209,6 @@
           <div class="sis-nombre" id="sisNombre"></div>
           <div class="ilustracion" id="ilustracion"></div>
         </div>
-        <div class="sis-der" id="hallazgos"></div>
       </div>
     </section>
 
@@ -241,7 +244,9 @@
 </script>
 <script type="module">
   import { crearVisor } from "/static/visor3d.js";
+  import { crearVisorOjos } from "/static/visorojos.js";
   window.__crearVisor = crearVisor;
+  window.__crearVisorOjos = crearVisorOjos;
   window.dispatchEvent(new Event("visor3d-disponible"));
 </script>
 <script src="/static/qrcode.js"></script>
@@ -522,12 +527,9 @@ function render(e) {
     }
     if (s.modelo3d) actualizarVisor3D(e);
     else actualizarIlustracion(sel, e);
-    $("hallazgos").innerHTML = s.hallazgos.map((h) => `
-      <div class="hallazgo ${h.severidad}">
-        <div><div class="n">${escapar(h.nombre)}</div><div class="v">${escapar(h.texto)}</div></div>
-        ${h.severidad === "ref" ? `<span class="tag ref">${ICONOS.estetoscopio}MANIQUÍ</span>`
-          : h.origen === "real" ? `<span class="tag real">REAL</span>` : ""}
-      </div>`).join("");
+    // Los hallazgos NO se escriben en el televisor: nombrar el signo
+    // ("pupilas puntiformes", "cianosis marcada") es regalarle el diagnóstico
+    // al estudiante. Tienen que verlo. El facilitador sí los ve en su panel.
     mostrarVista("vistaSistema");
   }
 }
@@ -594,12 +596,14 @@ function renderPines(e) {
 
 /* ---------- visor 3D (modelo del maniquí, repo de Juan) ---------- */
 let visor = null, visorSub = null, esquemaPupila = null, visorPendiente = false;
+let visorOjos = null, capaOjos = null;
 
 function montarVisor3D() {
   $("ilustracion").innerHTML = `
     <div class="visor3d" id="visor3d" data-estado="cargando">
       <div class="marca3d">MODELO 3D</div>
       <div class="cargando">CARGANDO MODELO…</div>
+      <div class="capa-ojos" id="capaOjos"></div>
       <div class="esquema-pupila" id="esquemaPupila" hidden>
         <svg viewBox="0 0 170 62">
           <ellipse cx="85" cy="31" rx="52" ry="26" fill="#f6f3ef" stroke="#7a5845" stroke-width="2"/>
@@ -611,6 +615,8 @@ function montarVisor3D() {
       </div>
     </div>`;
   esquemaPupila = $("esquemaPupila");
+  capaOjos = $("capaOjos");
+  if (window.__crearVisorOjos) visorOjos = window.__crearVisorOjos(capaOjos);
   if (window.__crearVisor) {
     visor = window.__crearVisor($("visor3d"));
     visorSub = null;
@@ -618,12 +624,16 @@ function montarVisor3D() {
     visorPendiente = true;
     addEventListener("visor3d-disponible", () => {
       visorPendiente = false;
-      if ($("visor3d")) { visor = window.__crearVisor($("visor3d")); visorSub = null; }
+      if ($("visor3d")) {
+        visor = window.__crearVisor($("visor3d"));
+        visorSub = null;
+        if (capaOjos && !visorOjos) visorOjos = window.__crearVisorOjos(capaOjos);
+      }
     }, { once: true });
   }
 }
 
-function soltarVisor3D() { visor = null; visorSub = null; esquemaPupila = null; }
+function soltarVisor3D() { visor = null; visorSub = null; esquemaPupila = null; visorOjos = null; capaOjos = null; }
 
 function actualizarVisor3D(e) {
   // Si el modelo no cargó (archivo movido, tarjeta gráfica vieja), se vuelve
@@ -642,15 +652,23 @@ function actualizarVisor3D(e) {
     visor.irAVista(sub, visorSub === null);
     visorSub = sub;
   }
-  // El modelo todavía no tiene ojos modelados: en la vista de pupilas se
-  // muestra el esquema 2D con el diámetro real del escenario.
+  // Vista de pupilas: si el modelo del ojo cargó, se muestran los dos ojos en
+  // 3D tapando la cabeza (que tiene los párpados cerrados). Si no cargó, se
+  // cae al esquema 2D de siempre en vez de dejar la vista vacía.
+  const enOjos = sub === "ojos";
+  const mm = e.visual.pupila_mm || 4;
+  const ojos3dListos = !!visorOjos && capaOjos && capaOjos.dataset.estado !== "error";
+
+  if (capaOjos) capaOjos.classList.toggle("si", enOjos && ojos3dListos);
+  // Sin texto encima de los ojos: el diámetro se estima mirando, no leyendo.
+  if (visorOjos && enOjos) visorOjos.aplicarEstado(e.visual);
+
   if (esquemaPupila) {
-    const mostrar = sub === "ojos";
+    const mostrar = enOjos && !ojos3dListos;
     esquemaPupila.hidden = !mostrar;
     if (mostrar) {
-      const mm = e.visual.pupila_mm || 4;
       $("pupilaEsq").setAttribute("r", (mm * 3.1).toFixed(1));
-      $("txtPupila").textContent = `PUPILA ≈ ${mm.toFixed(1)} mm · ESQUEMA (EL MODELO AÚN NO TIENE OJOS)`;
+      $("txtPupila").textContent = `PUPILA ≈ ${mm.toFixed(1)} mm · ESQUEMA (NO CARGÓ EL MODELO DEL OJO)`;
     }
   }
 }

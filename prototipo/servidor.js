@@ -81,6 +81,9 @@ function nuevaSesion() {
   E.rampa_s = 180;
   E.sistema = null;
   E.subvista = null;
+  // Parámetros visuales que el profesor fijó a mano (nombre -> valor).
+  // Se sueltan al reiniciar: cada grupo empieza con el escenario tal cual.
+  E.visual_manual = {};
   const f = new Date();
   const p = (n) => String(n).padStart(2, "0");
   E.sesion_id = `${f.getFullYear()}${p(f.getMonth() + 1)}${p(f.getDate())}_${p(f.getHours())}${p(f.getMinutes())}${p(f.getSeconds())}`;
@@ -142,6 +145,11 @@ function calcular() {
 
   const visual = {};
   for (const [n, r] of Object.entries(esc.visual)) visual[n] = Math.round(lerp(r[0], r[1], k) * 1000) / 1000;
+  // El profesor puede fijar cualquiera de estos signos a mano y mandar sobre
+  // el escenario, como lo haría desde el software del simulador.
+  for (const [nombre, v] of Object.entries(E.visual_manual || {})) {
+    if (nombre in visual) visual[nombre] = Math.round(v * 1000) / 1000;
+  }
 
   const sistemas = [];
   let totalCrit = 0, totalWarn = 0;
@@ -159,6 +167,16 @@ function calcular() {
     const crit = items.filter((i) => i.severidad === "crit").length;
     const warn = items.filter((i) => i.severidad === "warn").length;
     totalCrit += crit; totalWarn += warn;
+    // Con la pupila en manual, el hallazgo escrito tiene que decir lo mismo
+    // que se ve, o el panel del facilitador miente.
+    if ("pupila_mm" in (E.visual_manual || {})) {
+      for (const i of items) {
+        if (i.nombre.toLowerCase().startsWith("pupila")) {
+          i.texto = textoPupila(visual.pupila_mm);
+          i.severidad = severidadPupila(visual.pupila_mm);
+        }
+      }
+    }
     const disponible = !E.solo_modelados || !!s.modelo3d;
     sistemas.push({ ...s, hallazgos: items, criticos: crit, alertas: warn, disponible });
   }
@@ -181,6 +199,8 @@ function calcular() {
     mostrar_dx: E.mostrar_dx,
     mostrar_conteos: E.mostrar_conteos,
     solo_modelados: E.solo_modelados,
+    visual_manual: { ...E.visual_manual },
+    visual_rango: LIMITES_VISUAL,
     iniciado: E.iniciado,
     corriendo: E.corriendo,
     transcurrido_s: Math.round(transcurrido() * 10) / 10,
@@ -275,6 +295,29 @@ function tomarControl(c) {
   return { codigo: 200, cuerpo: { ok: true, controlador: false } };
 }
 
+// Lo único que el profesor puede mover a mano son estos siete parámetros, que
+// son exactamente los que el escenario ya calcula y las vistas ya dibujan.
+const LIMITES_VISUAL = {
+  pupila_mm: [0.8, 9.0],
+  cianosis: [0.0, 1.0],
+  palidez: [0.0, 1.0],
+  sudor: [0.0, 1.0],
+  temblor: [0.0, 1.0],
+  parpados: [0.0, 1.0],
+  marcas: [0.0, 1.0],
+};
+
+function textoPupila(mm) {
+  const nombre = mm <= 2.0 ? "Puntiformes"
+    : mm < 3.5 ? "Mióticas"
+    : mm < 5.5 ? "Normales"
+    : mm < 7.0 ? "Midriáticas"
+    : "Midriasis marcada";
+  return `${nombre}, ${mm.toFixed(1)} mm (manual)`;
+}
+
+const severidadPupila = (mm) => (mm <= 2.0 || mm >= 7.0) ? "crit" : (mm < 3.0 || mm >= 6.0) ? "warn" : "ok";
+
 // ¿Ese sistema tiene modelo 3D? Hoy solo la cabeza.
 const sistemaModelado = (sid) => !!(DATOS.sistemas.find((s) => s.id === sid) || {}).modelo3d;
 
@@ -337,6 +380,23 @@ function facilitador(c) {
     registrar("url_control", { valor: E.url_control });
   } else if (accion === "mostrar_conteos") {
     E.mostrar_conteos = !!valor; registrar("mostrar_conteos", { valor: !!valor });
+  } else if (accion === "visual_manual") {
+    // valor = {nombre: "cianosis", valor: 0.8}  |  valor null = auto
+    const d = (valor && typeof valor === "object") ? valor : {};
+    const nombre = d.nombre;
+    if (!(nombre in LIMITES_VISUAL)) return { codigo: 400, cuerpo: { error: "parámetro visual desconocido" } };
+    const v = d.valor;
+    if (v === null || v === undefined || v === "") {
+      delete E.visual_manual[nombre];
+      registrar("visual_auto", { parametro: nombre });
+    } else {
+      const [lo, hi] = LIMITES_VISUAL[nombre];
+      E.visual_manual[nombre] = Math.max(lo, Math.min(hi, parseFloat(v)));
+      registrar("visual_manual", { parametro: nombre, valor: Math.round(E.visual_manual[nombre] * 1000) / 1000 });
+    }
+  } else if (accion === "visual_todo_auto") {
+    E.visual_manual = {};
+    registrar("visual_todo_auto");
   } else if (accion === "solo_modelados") {
     E.solo_modelados = !!valor;
     // si se apaga el sistema que estaba abierto, se vuelve a la vista general

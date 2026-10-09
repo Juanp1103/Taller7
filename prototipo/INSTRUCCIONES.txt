@@ -188,6 +188,68 @@ relacionan lo que ven en la cara con el estado del paciente, y si los tres
 acercamientos les sirven o les estorban.
 
 
+SIGNOS FÍSICOS A MANO (para el profesor)
+-----------------------------------------
+En el panel del facilitador, dentro de "Evolución del paciente", están los
+siete signos físicos que el escenario calcula, cada uno con su deslizador:
+
+  Pupilas               0,8 a 9 mm   ojos en 3D
+  Cianosis              0 a 100 %    labios y piel · cara 3D y 2D
+  Palidez               0 a 100 %    piel · cara 3D y 2D
+  Sudoración            0 a 100 %    gotas y brillo · cara 3D, mano 2D
+  Temblor               0 a 100 %    solo extremidades (2D)
+  Párpados caídos       0 a 100 %    solo cara 2D
+  Marcas de venopunción 0 a 100 %    solo extremidades (2D)
+
+No hay nada inventado: son exactamente los parámetros que ya existían en
+escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
+fijarlos a mano.
+
+Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
+sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
+automático. El botón "auto" de cada fila suelta ese solo; "Todo en
+automático" los suelta todos; reiniciar también, así que cada grupo arranca
+igual sin que nadie se acuerde de bajarlos.
+
+La columna de la derecha dice dónde se nota cada uno, y conviene leerla: hoy
+el celular solo deja entrar a la cabeza y la cabeza se dibuja con el modelo
+3D, así que TEMBLOR y MARCAS (que viven en la mano) y PÁRPADOS CAÍDOS (que
+vive en la cara 2D) no se van a ver a menos que apaguen la casilla "Solo los
+sistemas que ya tienen modelo 3D". Se dejaron igual para que estén listos
+cuando el resto del cuerpo exista.
+
+Sirven también con el lector conectado. De hecho ahí es donde más sirven,
+porque el monitor real no reporta nada de esto y los demás controles quedan
+desactivados: son los únicos signos que el profesor puede mover en vivo.
+
+Cada cambio queda en el registro de la sesión (visual_manual con el parámetro
+y el valor, visual_auto al soltar uno, visual_todo_auto al soltar todos), así
+que después se puede reconstruir en qué momento intervino el profesor y
+separar lo que el estudiante vio solo de lo que alguien provocó.
+
+Con las pupilas en manual, el hallazgo escrito en el panel del facilitador se
+recalcula a partir de los milímetros reales (puntiformes / mióticas /
+normales / midriáticas) y se marca "(manual)", para que el panel no diga una
+cosa y la pantalla muestre otra.
+
+
+LOS HALLAZGOS TAMPOCO SE ESCRIBEN EN EL TELEVISOR
+--------------------------------------------------
+La vista ampliada de un sistema ya NO lista los hallazgos ("Pupilas:
+puntiformes", "Labios: cianosis marcada", "Piel facial: pálida y fría"). Poner
+el nombre del signo en pantalla es regalarle el diagnóstico al grupo: el
+estudiante tiene que verlo en la imagen, no leerlo.
+
+Lo que queda en el televisor son los signos vitales, el ECG y la imagen del
+sistema, que es lo que de verdad hay que interpretar. La imagen ahora ocupa
+todo el panel, así que se ve bastante más grande que antes.
+
+Los hallazgos siguen existiendo: aparecen en el panel del facilitador, en la
+tarjeta "LO QUE DEBERÍA ESTAR VIENDO EL ESTUDIANTE". Sirven para que quien
+observa sepa qué hay en pantalla y pueda anotar si el grupo lo mencionó o se
+le pasó. Esa es justamente la medición interesante.
+
+
 EL DIAGNÓSTICO NO APARECE EN PANTALLA (A PROPÓSITO)
 ---------------------------------------------------
 El diseño de Figma decía "Sobredosis de Opioides" en el título. Lo cambié a
@@ -243,18 +305,44 @@ Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo
 tiene otra escala u orientación, ajustar las posiciones de cámara en
 static/visor3d.js (constante VISTAS) y el punto BOCA.
 
+LOS OJOS EN 3D (static/ojo.glb)
+--------------------------------
+La vista "Ojos / pupilas" ya NO es un esquema 2D: son dos ojos en 3D.
+
+El diseñador entregó un modelo de ojo con dos materiales separados,
+"Eye" (globo y córnea) e "Iris". La pupila NO viene en el modelo, y así debe
+ser: la dibuja la app, y su diámetro sale directo del valor en milímetros del
+escenario. Dos milímetros son dos milímetros, no una malla escalada a ojo.
+El globo mide 2 unidades y se toma como 24 mm, así que 1 unidad = 12 mm.
+
+Dos defectos del archivo se compensan en static/visorojos.js y por eso no
+bloquearon nada; si el diseñador los corrige, se puede borrar ese arreglo:
+  - el material "Eye" venía con transparencia (alpha BLEND) siendo opaco. En
+    tiempo real eso causa errores de orden de dibujo y el borde se ve
+    festoneado. Debería exportarse opaco.
+  - la córnea es parte de la misma malla cerrada, así que tapa el iris. La app
+    abre una ventana en el casquete frontal con un discard en el shader, con
+    el borde justo en el limbo.
+  - las normales venían partidas en la costura de las UV y cruzaba una línea
+    horizontal el globo. La app suelda los vértices y las recalcula.
+
+Para cambiar el color del iris o el tamaño del hueco, ver las constantes del
+principio de static/visorojos.js.
+
 QUÉ LE FALTA AL MODELO (para pedirle al diseñador)
 --------------------------------------------------
-  1. OJOS. El .glb actual tiene los párpados cerrados y no tiene globo ocular
-     ni pupila, así que la miosis (el signo más importante de la heroína) no
-     se puede mostrar en 3D. Hoy se muestra un esquema 2D con el diámetro
-     correcto y un aviso de que es un esquema. Hace falta exportar los ojos
-     como mallas separadas y con nombre (Ojo_Izq, Pupila_Izq, etc.).
-  2. LABIOS separados como malla o material propio, para que la cianosis se
+  1. PÁRPADOS ABIERTOS en la malla de la cabeza. Mientras la cabeza los tenga
+     cerrados, los ojos no se pueden meter en la cara: se muestran como un
+     acercamiento aparte. Es lo único que falta para que la vista de ojos deje
+     de ser una lámina y pase a ser el paciente.
+  2. LENGUA, como malla o material propio y con la boca entreabierta. La
+     cianosis central se valora en la lengua y la mucosa, no en los labios;
+     tenerlas las dos deja mostrar la diferencia entre central y periférica.
+  3. LABIOS separados como malla o material propio, para que la cianosis se
      pinte exacta en vez de aproximarla por distancia a la boca.
-  3. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
+  4. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
      con ilustraciones 2D.
-  4. Texturas: el modelo no trae ninguna; el color lo pone la app.
+  5. Texturas: ninguno de los dos modelos trae; el color lo pone la app.
 
 ARCHIVOS
 --------
@@ -266,8 +354,10 @@ ARCHIVOS
                      Son valores de PRUEBA: hay que pasarlos por el profesor
                      de toxicología antes de usarlos como contenido final.
   static/            Las páginas (monitor, control, facilitador).
-  static/modelo.glb  El modelo 3D del maniquí (del repo de Juan).
-  static/visor3d.js  El visor 3D: material de piel, gotas y vuelos de cámara.
+  static/modelo.glb  El modelo 3D de la cabeza (del repo de Juan).
+  static/ojo.glb     El modelo 3D del ojo (del diseñador).
+  static/visor3d.js  El visor 3D de la cabeza: piel, gotas y vuelos de cámara.
+  static/visorojos.js El visor 3D de los ojos y el cálculo de la pupila en mm.
   static/vendor/     Three.js local (para que funcione sin internet).
   registros/         Se llena solo con cada sesión.
   INICIAR.bat        Arranque con doble clic.
