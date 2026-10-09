@@ -94,6 +94,9 @@ class Estado:
         self.escenario = "heroina"
         self.mostrar_dx = False
         self.mostrar_conteos = True
+        # Esconde los signos vitales y el ECG para que la imagen del paciente
+        # use todo el ancho del televisor.
+        self.ocultar_vitales = False
         # Hoy solo la cabeza tiene modelo 3D. Mientras el resto del cuerpo no esté
         # modelado, el celular no debería dejar entrar a sistemas que no existen.
         self.solo_modelados = True
@@ -236,6 +239,7 @@ class Estado:
             "motivo": esc["motivo"],
             "mostrar_dx": self.mostrar_dx,
             "mostrar_conteos": self.mostrar_conteos,
+            "ocultar_vitales": self.ocultar_vitales,
             "solo_modelados": self.solo_modelados,
             "visual_manual": dict(self.visual_manual),
             "visual_rango": LIMITES_VISUAL,
@@ -604,6 +608,9 @@ class Manejador(BaseHTTPRequestHandler):
                 E.visual_manual[nombre] = max(lo, min(hi, float(v)))
                 E.registrar("visual_manual", parametro=nombre,
                             valor=round(E.visual_manual[nombre], 3))
+        elif accion == "ocultar_vitales":
+            E.ocultar_vitales = bool(valor)
+            E.registrar("ocultar_vitales", valor=bool(valor))
         elif accion == "visual_todo_auto":
             E.visual_manual.clear()
             E.registrar("visual_todo_auto")

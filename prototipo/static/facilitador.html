@@ -98,6 +98,7 @@
       <label class="sw"><input type="checkbox" id="mostrarDx"> Mostrar el diagnóstico en el título del monitor</label>
       <label class="sw"><input type="checkbox" id="mostrarConteos" checked> Mostrar conteo de críticos en el celular</label>
       <label class="sw"><input type="checkbox" id="soloModelados" checked> Solo los sistemas que ya tienen modelo 3D</label>
+      <label class="sw"><input type="checkbox" id="ocultarVitales"> Ocultar signos vitales y ECG (imagen a pantalla completa)</label>
       <p class="nota">Por defecto el monitor NO muestra el diagnóstico (solo "Caso A / Caso B"), para que los estudiantes lo deduzcan.</p>
       <p class="nota">Hoy lo único modelado es la cabeza, así que el celular solo deja entrar ahí. Al apagar esa casilla vuelven a aparecer tórax, abdomen y los demás con ilustraciones 2D.</p>
     </div>
@@ -199,6 +200,7 @@ $("rampa").onchange = (ev) => accion("rampa", parseFloat(ev.target.value) * 60);
 $("mostrarDx").onchange = (ev) => accion("mostrar_dx", ev.target.checked);
 $("mostrarConteos").onchange = (ev) => accion("mostrar_conteos", ev.target.checked);
 $("soloModelados").onchange = (ev) => accion("solo_modelados", ev.target.checked);
+$("ocultarVitales").onchange = (ev) => accion("ocultar_vitales", ev.target.checked);
 $("btnSoltar").onclick = () => accion("soltar_control");
 $("btnNota").onclick = () => { const t = $("nota").value.trim(); if (t) { accion("nota", t); $("nota").value = ""; cargarRegistro(); } };
 $("nota").onkeydown = (ev) => { if (ev.key === "Enter") $("btnNota").click(); };
@@ -282,6 +284,7 @@ function render(s) {
   $("mostrarDx").checked = s.mostrar_dx;
   $("mostrarConteos").checked = s.mostrar_conteos;
   $("soloModelados").checked = s.solo_modelados !== false;
+  $("ocultarVitales").checked = !!s.ocultar_vitales;
 
   $("fuente").className = "v " + (s.datos_reales ? "ok" : "warn");
   $("fuente").textContent = s.datos_reales ? "LECTOR CONECTADO (REAL)" : "MODO DEMO";
@@ -357,7 +360,7 @@ const NOMBRES = { caso_iniciado: "Caso iniciado", sistema_abierto: "Abrió", vis
   control_liberado: "Control liberado", mostrar_conteos: "Conteos en celular", url_control: "Dirección del QR",
   solo_modelados: "Solo sistemas modelados",
   visual_manual: "Signo a mano", visual_auto: "Signo en automático",
-  visual_todo_auto: "Todo en automático" };
+  visual_todo_auto: "Todo en automático", ocultar_vitales: "Vitales ocultos en el televisor" };
 async function cargarRegistro() {
   try {
     const t = await (await fetch("/api/registro", { cache: "no-store" })).text();

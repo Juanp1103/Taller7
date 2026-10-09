@@ -233,6 +233,23 @@ normales / midriáticas) y se marca "(manual)", para que el panel no diga una
 cosa y la pantalla muestre otra.
 
 
+VER EL MODELO A PANTALLA COMPLETA
+----------------------------------
+En el panel del facilitador hay una casilla: "Ocultar signos vitales y ECG
+(imagen a pantalla completa)". Al prenderla, la columna derecha del televisor
+desaparece y la imagen del paciente pasa de 820 a 1500 px de ancho. Sirve para
+cuando quieran que el grupo mire el signo físico y nada más, o para enseñarle
+el modelo a alguien de lejos.
+
+Desde el computador del televisor también se puede con la tecla V, sin tener
+que ir al panel. Es la misma casilla: lo que se prenda en un lado se ve en el
+otro, y queda en el registro de la sesión.
+
+Ojo con usarla durante una prueba de usuario: esconder los vitales cambia lo
+que el estudiante tiene para razonar, así que si la usan con un grupo hay que
+anotarlo, porque ese grupo deja de ser comparable con los demás.
+
+
 LOS HALLAZGOS TAMPOCO SE ESCRIBEN EN EL TELEVISOR
 --------------------------------------------------
 La vista ampliada de un sistema ya NO lista los hallazgos ("Pupilas:

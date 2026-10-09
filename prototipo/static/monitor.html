@@ -50,6 +50,12 @@
 
   /* ---------- cuerpo principal ---------- */
   main { flex: 1; display: grid; grid-template-columns: 1040px 1fr; gap: 24px; min-height: 0; }
+  /* Modo "solo imagen": se esconden los signos vitales y el ECG, y la vista
+     del paciente se queda con todo el ancho del televisor. */
+  #escenario.sin-vitales main { grid-template-columns: 1fr; }
+  #escenario.sin-vitales #der { display: none; }
+  #escenario.sin-vitales .visor3d { width: 1500px; height: 790px; }
+  #escenario.sin-vitales .ilustracion > svg { width: 900px; height: 780px; }
   .panel { background: linear-gradient(180deg, rgba(15,28,45,.85), rgba(10,20,33,.85)); border: 1px solid var(--borde); border-radius: 22px; position: relative; overflow: hidden; }
   #izq { display: flex; }
   .vista { position: absolute; inset: 0; opacity: 0; transform: scale(.985); transition: opacity .45s ease, transform .45s ease; pointer-events: none; }
@@ -449,6 +455,9 @@ function actualizarIlustracion(id, e) {
 /* ---------- render principal ---------- */
 function render(e) {
   estado = e;
+  // Modo "solo imagen": lo prende el facilitador, o la tecla V en este mismo
+  // computador. Los visores se reajustan solos (tienen ResizeObserver).
+  $("escenario").classList.toggle("sin-vitales", !!e.ocultar_vitales);
   $("titulo").textContent = e.diagnostico ? e.diagnostico : `${e.codigo} · Paciente en urgencias`;
   $("subtitulo").textContent = `Paciente · ${e.paciente} · ${e.motivo}`;
   $("tiempo").textContent = "T+ " + reloj(e.transcurrido_s);
@@ -672,6 +681,16 @@ function actualizarVisor3D(e) {
     }
   }
 }
+
+// Atajo para quien esté en el computador del televisor: V esconde o muestra
+// los signos vitales sin tener que ir al panel del facilitador.
+addEventListener("keydown", (ev) => {
+  if (ev.key !== "v" && ev.key !== "V") return;
+  fetch("/api/facilitador", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accion: "ocultar_vitales", valor: !(estado && estado.ocultar_vitales) }),
+  });
+});
 
 conectar("monitor", null, render, (ok) => $("desconectado").classList.toggle("si", !ok));
 </script>

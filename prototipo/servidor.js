@@ -58,6 +58,9 @@ const E = {
   escenario: "heroina",
   mostrar_dx: false,
   mostrar_conteos: true,
+  // Esconde los signos vitales y el ECG para que la imagen del paciente use
+  // todo el ancho del televisor.
+  ocultar_vitales: false,
   // Hoy solo la cabeza tiene modelo 3D. Mientras el resto del cuerpo no esté
   // modelado, el celular no debería dejar entrar a sistemas que no existen.
   solo_modelados: true,
@@ -198,6 +201,7 @@ function calcular() {
     motivo: esc.motivo,
     mostrar_dx: E.mostrar_dx,
     mostrar_conteos: E.mostrar_conteos,
+    ocultar_vitales: E.ocultar_vitales,
     solo_modelados: E.solo_modelados,
     visual_manual: { ...E.visual_manual },
     visual_rango: LIMITES_VISUAL,
@@ -394,6 +398,9 @@ function facilitador(c) {
       E.visual_manual[nombre] = Math.max(lo, Math.min(hi, parseFloat(v)));
       registrar("visual_manual", { parametro: nombre, valor: Math.round(E.visual_manual[nombre] * 1000) / 1000 });
     }
+  } else if (accion === "ocultar_vitales") {
+    E.ocultar_vitales = !!valor;
+    registrar("ocultar_vitales", { valor: !!valor });
   } else if (accion === "visual_todo_auto") {
     E.visual_manual = {};
     registrar("visual_todo_auto");
