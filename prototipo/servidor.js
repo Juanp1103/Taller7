@@ -20,7 +20,16 @@ const AQUI = __dirname;
 const ESTATICOS = path.join(AQUI, "static");
 const REGISTROS = path.join(AQUI, "registros");
 const PUERTO = parseInt(process.argv[2] || process.env.SIMCLIN_PUERTO || "8080", 10);
-const LECTOR_URL = process.env.LECTOR_URL || "http://127.0.0.1:5050/vitals";
+// El lector normalmente corre en el mismo computador. Si corre en el del
+// simulador, se escribe su dirección en lector_url.txt y no hay que tocar nada
+// más (también sirve la variable de entorno LECTOR_URL).
+const LECTOR_URL = (() => {
+  try {
+    const t = fs.readFileSync(path.join(AQUI, "lector_url.txt"), "utf8").trim();
+    if (t && !t.startsWith("#")) return t;
+  } catch (e) { /* no existe: se usa el de siempre */ }
+  return process.env.LECTOR_URL || "http://127.0.0.1:5050/vitals";
+})();
 const LECTOR_VIGENCIA_S = 5;
 const CONTROL_INACTIVO_S = 12;
 const TICK_MS = 500;
@@ -483,6 +492,12 @@ function consultarLector() {
         const datos = JSON.parse(b);
         const valores = {};
         for (const [k, v] of Object.entries(datos.values || {})) {
+          if (Array.isArray(v)) {
+            // La TA viaja como par sistólica/diastólica.
+            const s = parseFloat(v[0]), d = parseFloat(v[1]);
+            if (v.length === 2 && !Number.isNaN(s) && !Number.isNaN(d)) valores[k] = [s, d];
+            continue;
+          }
           const n = parseFloat(v);
           if (!Number.isNaN(n)) valores[k] = n;
         }

@@ -40,7 +40,20 @@ AQUI = Path(__file__).resolve().parent
 ESTATICOS = AQUI / "static"
 REGISTROS = AQUI / "registros"
 PUERTO = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("SIMCLIN_PUERTO", "8080"))
-LECTOR_URL = os.environ.get("LECTOR_URL", "http://127.0.0.1:5050/vitals")
+
+def _url_lector():
+    """El lector normalmente corre en el mismo computador. Si corre en el del
+    simulador, se escribe su dirección en lector_url.txt y no hay que tocar nada
+    más (también sirve la variable de entorno LECTOR_URL)."""
+    archivo = AQUI / "lector_url.txt"
+    if archivo.exists():
+        texto = archivo.read_text(encoding="utf-8").strip()
+        if texto and not texto.startswith("#"):
+            return texto
+    return os.environ.get("LECTOR_URL", "http://127.0.0.1:5050/vitals")
+
+
+LECTOR_URL = _url_lector()
 LECTOR_VIGENCIA_S = 5.0        # si el lector no actualiza en este tiempo, se considera desconectado
 CONTROL_INACTIVO_S = 12.0      # si el celular que tiene el control deja de responder, se libera
 TICK_S = 0.5
@@ -289,8 +302,12 @@ def hilo_lector():
             valores = {}
             for k, v in (datos.get("values") or {}).items():
                 try:
-                    valores[k] = float(v) if v is not None else None
-                except (TypeError, ValueError):
+                    if isinstance(v, (list, tuple)):
+                        # La TA viaja como par sistólica/diastólica.
+                        valores[k] = [float(v[0]), float(v[1])] if len(v) == 2 else None
+                    else:
+                        valores[k] = float(v) if v is not None else None
+                except (TypeError, ValueError, IndexError):
                     valores[k] = None
             actualizado = datos.get("updated_at") or 0
             with ESTADO.lock:

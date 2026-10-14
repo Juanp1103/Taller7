@@ -1,0 +1,113 @@
+LECTOR DEL MONITOR DEL SIMULADOR
+=================================
+
+Qué hace
+--------
+Mira la pantalla del "patient monitor" y publica los números que ve en
+http://127.0.0.1:5050/vitals. El servidor de SimClin pregunta por esa dirección
+cada segundo; si contesta, el televisor pasa solo a "DATOS REALES DEL SIMULADOR"
+y cada signo se marca REAL en vez de SIM. Si no contesta, no pasa nada: el
+prototipo sigue en modo demo y el facilitador maneja la evolución a mano.
+
+No usa OCR de propósito general. El monitor dibuja los números siempre con la
+misma fuente, el mismo tamaño y en el mismo lugar, así que se comparan contra
+plantillas recortadas de la pantalla real. Es más exacto que un OCR, no hay que
+instalar Tesseract, y cuando no está seguro prefiere no decir nada antes que
+inventar un número.
+
+Lo único que necesita instalado es Pillow:   pip install pillow
+
+
+Dónde corre
+-----------
+El lector tiene que correr EN EL COMPUTADOR QUE MUESTRA EL MONITOR, porque lee
+su pantalla. El servidor de SimClin puede correr ahí mismo o en otro portátil.
+
+  - Todo en el mismo computador: no hay que configurar nada.
+  - Servidor en otro computador: en la carpeta de SimClin se crea un archivo
+    lector_url.txt con una sola línea:
+
+        http://192.168.137.25:5050/vitals
+
+    (la IP del computador del simulador). Los dos tienen que estar en la misma
+    red y el firewall de Windows tiene que dejar pasar el puerto 5050.
+
+
+Puesta a punto, una sola vez por laboratorio
+---------------------------------------------
+1. Con el monitor mostrando valores:
+
+       python calibrar.py captura
+
+   Se guarda una foto en capturas/. Repetir 5 o 6 veces cambiando los valores
+   desde LLEAP: estable, empeorando, crítico. Entre todas las fotos tienen que
+   aparecer los diez dígitos; si en todas la FC es 80, el lector solo va a
+   saber leer ochentas.
+
+2. Definir los recuadros en roi_config.json: uno por signo, en coordenadas de
+   la pantalla completa (izquierda, arriba, derecha, abajo). Cada recuadro tiene
+   que encerrar el número con aire de sobra a los lados: si el número crece de
+   dos a tres dígitos y toca el borde, el lector lo avisa y no lee.
+
+       "fc": { "caja": [120, 80, 330, 205], "estilo": "grande", "rango": [20, 250] }
+
+   Opciones por campo:
+       estilo      carpeta de plantillas que usa (los números chicos y los
+                   grandes del monitor son estilos distintos)
+       rango       mínimo y máximo creíbles; fuera de ahí descarta la lectura
+       decimales   1 para la temperatura (el punto se ignora y se divide por 10)
+       tipo: par   para la TA, cuando sistólica y diastólica están en el mismo
+                   recuadro separadas por "/"
+       fondo       "claro" si el monitor es de fondo blanco
+       umbral      qué tan parecido tiene que ser un dígito (0.80 por defecto)
+
+3. Confirmar que los recuadros quedaron bien puestos:
+
+       python calibrar.py marcar
+
+   Deja capturas/recuadros.png con los recuadros dibujados encima.
+
+4. Recortar las plantillas de los dígitos, diciéndole el valor verdadero:
+
+       python calibrar.py plantillas capturas/pantalla_101530.png fc=112 ta=118/72 spo2=88 fr=6 etco2=58 temp=35.4
+
+   Repetir con las otras fotos hasta que diga "completo" (los diez dígitos).
+   Lo que ya tiene no lo pisa, así que no importa repetir.
+
+5. Probar sin publicar nada:
+
+       python lector.py --probar
+
+   Imprime lo que está leyendo en este momento, y cuando no puede leer algo
+   dice por qué ("el número toca el borde", "un dígito no se parece a ninguna
+   plantilla", "queda fuera del rango").
+
+
+Durante la sesión
+-----------------
+       python lector.py
+
+Dejar esa ventana abierta. En http://127.0.0.1:5050 (sin /vitals) hay una
+página que muestra qué está leyendo, y sirve para mirar de reojo si se
+desconfía de algún número.
+
+El monitor del simulador tiene que quedar VISIBLE en la pantalla. Si se tapa con
+otra ventana, el lector deja de leer, los valores se vuelven viejos y a los 5
+segundos el prototipo vuelve solo a modo demo. No se rompe nada, pero el
+televisor deja de decir REAL.
+
+
+Cómo evita decir mentiras
+-------------------------
+  - Un valor solo se publica cuando se leyó igual dos veces seguidas, así un
+    parpadeo del monitor o un cursor encima no mueven el número.
+  - Si un dígito no se parece lo suficiente a ninguna plantilla, no se lee el
+    campo entero.
+  - Si el número toca el borde del recuadro, no se lee: está cortado.
+  - Si el valor queda fuera del rango creíble del campo, se descarta.
+  - Si el lector deja de actualizar por 5 segundos, el servidor lo da por
+    desconectado y vuelve a modo demo.
+
+En todos esos casos el campo se queda con el valor de demo y marcado SIM. Es a
+propósito: para una prueba de usuario es mucho peor mostrar un número falso que
+mostrar uno simulado y avisado.

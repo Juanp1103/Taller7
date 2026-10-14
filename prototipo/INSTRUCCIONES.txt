@@ -151,19 +151,22 @@ ANTES DE LA PRUEBA CON ESTUDIANTES
 
 DATOS REALES VS. MODO DEMO
 --------------------------
-  - Si el lector de la carpeta "lector_monitor" está corriendo en el mismo
-    computador (python capture_ocr.py --live), el prototipo lo detecta solo:
-    el monitor muestra "DATOS REALES DEL SIMULADOR", la FC y la FR llevan la
-    etiqueta REAL, y la evolución del paciente (pupilas, labios, sudor,
-    hallazgos) se calcula a partir de ese dato real. El profesor controla
-    todo desde LLEAP como siempre.
+  - Si el lector de la carpeta "lector_monitor" está corriendo (python
+    lector.py, en el computador que muestra el monitor del simulador), el
+    prototipo lo detecta solo: el televisor muestra "DATOS REALES DEL
+    SIMULADOR", cada signo que venga de allá lleva la etiqueta REAL, y la
+    evolución del paciente (pupilas, labios, sudor, hallazgos) se calcula a
+    partir de ese dato real. El profesor controla todo desde LLEAP como
+    siempre. Ver lector_monitor/LEEME.txt.
   - Si no hay lector, arranca en MODO DEMO (aviso amarillo, etiquetas SIM) y
     el facilitador maneja la evolución desde su panel:
       · "Progresión automática": el paciente empeora solo en X minutos.
       · "Simular mejoría (naloxona)": revierte el cuadro en ~45 s.
       · El deslizador pone la intensidad exacta.
-  - Hoy el lector solo lee FC y FR. TA, SpO2, EtCO2 y T° siempre salen como
-    SIM hasta que se calibren sus recuadros en roi_config.json.
+  - El lector lee los seis signos, pero solo los que tengan su recuadro
+    calibrado en roi_config.json. Los que no, siguen saliendo SIM. Si un
+    número queda cortado, borroso o imposible, el lector prefiere no leerlo:
+    ese campo vuelve a SIM en vez de mostrar algo falso.
 
 
 SOLO LA CARA (ASÍ ESTÁ HOY)
@@ -435,6 +438,13 @@ ARCHIVOS
   PUNTO_DE_ACCESO.bat  Para cuando el wifi de la universidad no deja que el
                      celular vea al computador (ver la sección del wifi).
   red/               El ayudante de PowerShell que usa ese .bat.
+  lector_monitor/    El lector de la pantalla del simulador: mira el monitor,
+                     reconoce los números y los publica para que el prototipo
+                     los use como datos reales. Hay que calibrarlo una vez por
+                     laboratorio (lector_monitor/LEEME.txt).
+  lector_url.txt     Opcional. Solo si el lector corre en OTRO computador: una
+                     línea con su dirección, por ejemplo
+                     http://192.168.137.25:5050/vitals
 
 
 QUÉ FALTA / SIGUIENTE

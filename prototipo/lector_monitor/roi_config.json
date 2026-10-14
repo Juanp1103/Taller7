@@ -1,0 +1,11 @@
+{
+  "_nota": "PLANTILLA SIN CALIBRAR. Las cajas son coordenadas de la pantalla completa [izquierda, arriba, derecha, abajo] y hay que medirlas sobre una captura del monitor de este laboratorio. Ver LEEME.txt, paso 2. Dejá aire de sobra a los lados: si el número crece de dos a tres dígitos y toca el borde, el lector avisa y no lee.",
+  "campos": {
+    "fc":    { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [20, 250] },
+    "ta":    { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [20, 260], "tipo": "par" },
+    "spo2":  { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [40, 100] },
+    "fr":    { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [2, 60] },
+    "etco2": { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [5, 99] },
+    "temp":  { "caja": [0, 0, 0, 0], "estilo": "grande", "rango": [30, 43], "decimales": 1 }
+  }
+}
