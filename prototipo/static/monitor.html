@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimClin · Monitor</title>
+<style>
+  :root {
+    --fondo: #070d17;
+    --panel: #0c1624;
+    --panel-2: #0f1c2d;
+    --borde: #1a2c40;
+    --borde-2: #22384f;
+    --texto: #e6edf5;
+    --texto-2: #8a9bb0;
+    --texto-3: #5b6c80;
+    --cian: #22c3e6;
+    --cian-suave: rgba(34,195,230,.14);
+    --ok: #22c55e;
+    --warn: #f5a524;
+    --crit: #f04848;
+    --ecg: #2bd46b;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #03070d; color: var(--texto); font-family: var(--sans); overflow: hidden; }
+  /* Escenario fijo 1920x1080 que se escala para llenar cualquier televisor */
+  #escenario { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 50% 50%;
+    background: radial-gradient(1200px 700px at 30% 40%, #0d1a2b 0%, var(--fondo) 70%); padding: 28px 32px 22px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ---------- encabezado ---------- */
+  header { display: flex; align-items: flex-start; justify-content: space-between; }
+  .marca { font-family: var(--mono); font-size: 15px; letter-spacing: .22em; color: var(--cian); text-transform: uppercase; }
+  h1 { margin: 8px 0 4px; font-size: 40px; font-weight: 750; letter-spacing: -.01em; }
+  .sub { color: var(--texto-2); font-size: 19px; }
+  .der { display: flex; align-items: center; gap: 16px; }
+  .chip { font-family: var(--mono); font-size: 15px; letter-spacing: .08em; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--borde-2); color: var(--texto-2); display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .chip .p { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .chip.real { color: var(--ok); border-color: rgba(34,197,94,.45); background: rgba(34,197,94,.08); }
+  .chip.demo { color: var(--warn); border-color: rgba(245,165,36,.4); background: rgba(245,165,36,.07); }
+  .tiempo { font-family: var(--mono); font-size: 24px; color: var(--texto-2); min-width: 120px; text-align: right; }
+  .estado { font-family: var(--mono); font-size: 17px; letter-spacing: .14em; font-weight: 700; padding: 11px 20px; border-radius: 999px; border: 1px solid; display: inline-flex; gap: 10px; align-items: center; }
+  .estado .p { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .estado.crit { color: var(--crit); border-color: rgba(240,72,72,.55); background: rgba(240,72,72,.1); }
+  .estado.crit .p { animation: parpadeo 1s steps(2) infinite; }
+  .estado.warn { color: var(--warn); border-color: rgba(245,165,36,.5); background: rgba(245,165,36,.08); }
+  .estado.ok { color: var(--ok); border-color: rgba(34,197,94,.45); background: rgba(34,197,94,.07); }
+  .estado.espera { color: var(--texto-2); border-color: var(--borde-2); }
+
+  /* ---------- cuerpo principal ---------- */
+  main { flex: 1; display: grid; grid-template-columns: 1040px 1fr; gap: 24px; min-height: 0; }
+  /* Modo "solo imagen": se esconden los signos vitales y el ECG, y la vista
+     del paciente se queda con todo el ancho del televisor. */
+  #escenario.sin-vitales main { grid-template-columns: 1fr; }
+  #escenario.sin-vitales #der { display: none; }
+  #escenario.sin-vitales .visor3d { width: 1500px; height: 790px; }
+  #escenario.sin-vitales .ilustracion > svg { width: 900px; height: 780px; }
+  .panel { background: linear-gradient(180deg, rgba(15,28,45,.85), rgba(10,20,33,.85)); border: 1px solid var(--borde); border-radius: 22px; position: relative; overflow: hidden; }
+  #izq { display: flex; }
+  .vista { position: absolute; inset: 0; opacity: 0; transform: scale(.985); transition: opacity .45s ease, transform .45s ease; pointer-events: none; }
+  .vista.activa { opacity: 1; transform: none; pointer-events: auto; }
+
+  /* vista general: silueta */
+  #vistaGeneral { display: flex; align-items: center; justify-content: center; }
+  #silueta { height: 790px; overflow: visible; }
+  #silueta .contorno { fill: rgba(34,195,230,.05); stroke: #2aa9c9; stroke-width: 2; }
+  #silueta .marca-reg { stroke: #2aa9c9; stroke-width: 1.6; fill: none; opacity: .75; }
+  .etiqueta-vista { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-family: var(--mono); letter-spacing: .24em; font-size: 14px; color: var(--texto-3); }
+  .pin { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .pin circle.anillo { transform-box: fill-box; transform-origin: center; animation: pulso 1.6s ease-out infinite; }
+
+  /* vista de sistema — sin lista de hallazgos: lo que pasa se mira, no se lee */
+  #vistaSistema { display: block; }
+  .sis-izq { padding: 30px 34px; display: flex; flex-direction: column; height: 100%; }
+  .sis-titulo { font-family: var(--mono); font-size: 15px; letter-spacing: .22em; color: var(--cian); display: flex; align-items: center; gap: 12px; }
+  .sis-titulo svg { width: 26px; height: 26px; }
+  .sis-nombre { font-size: 38px; font-weight: 750; margin: 10px 0 0; }
+  .ilustracion { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .ilustracion > svg { width: 620px; height: 700px; overflow: visible; }
+  .visor3d { position: relative; width: 820px; height: 720px; }
+  .visor3d canvas { border-radius: 18px; }
+  .visor3d .cargando { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 14px; letter-spacing: .14em; color: var(--texto-3); }
+  .visor3d[data-estado="listo"] .cargando { display: none; }
+  .esquema-pupila { position: absolute; right: 8px; bottom: 8px; width: 190px; background: rgba(8,16,26,.9); border: 1px solid var(--borde-2); border-radius: 14px; padding: 12px 14px; }
+  .esquema-pupila svg { width: 100%; height: 62px; display: block; }
+  .esquema-pupila .txt { font-family: var(--mono); font-size: 10.5px; line-height: 1.45; color: var(--texto-3); margin-top: 8px; letter-spacing: .04em; }
+  .marca3d { position: absolute; left: 10px; top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--cian); opacity: .75; }
+  .sis-der { padding: 34px 34px 30px 16px; display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+  .hallazgo { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 20px 22px; border-radius: 16px; background: rgba(255,255,255,.025); border: 1px solid var(--borde); border-left: 5px solid var(--texto-3); }
+  .hallazgo .n { font-size: 17px; color: var(--texto-2); letter-spacing: .01em; }
+  .hallazgo .v { font-size: 27px; font-weight: 650; margin-top: 4px; }
+  .hallazgo.ok { border-left-color: rgba(34,197,94,.7); }
+  .hallazgo.warn { border-left-color: var(--warn); background: rgba(245,165,36,.05); }
+  .hallazgo.warn .v { color: var(--warn); }
+  .hallazgo.crit { border-left-color: var(--crit); background: rgba(240,72,72,.07); border-color: rgba(240,72,72,.35); }
+  .hallazgo.crit .v { color: var(--crit); }
+  .hallazgo.ref { border-left-color: var(--cian); border-style: dashed; border-left-style: solid; }
+  .hallazgo.ref .v { color: var(--cian); font-size: 22px; }
+  .tag { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--borde-2); color: var(--texto-3); display: inline-flex; align-items: center; gap: 6px; }
+  .tag svg { width: 16px; height: 16px; }
+  .tag.real { color: var(--ok); border-color: rgba(34,197,94,.4); }
+  .tag.ref { color: var(--cian); border-color: rgba(34,195,230,.4); }
+
+  /* vista de espera */
+  #vistaEspera { display: flex; align-items: center; justify-content: center; }
+  .espera-caja { display: flex; gap: 56px; align-items: center; }
+  .qr { background: #fff; border-radius: 18px; padding: 14px; width: 300px; height: 300px; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .espera-txt h2 { font-size: 38px; margin: 0 0 14px; }
+  .espera-txt p { font-size: 21px; color: var(--texto-2); margin: 0 0 12px; max-width: 520px; line-height: 1.45; }
+  .url { font-family: var(--mono); color: var(--cian); font-size: 22px; margin-top: 20px; }
+
+  /* ---------- signos vitales ---------- */
+  #der { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+  .grilla { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .vital { padding: 22px 24px 20px; border-radius: 18px; background: var(--panel); border: 1px solid var(--borde); position: relative; transition: opacity .4s, border-color .3s, background .3s; }
+  .vital .cab { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 15px; letter-spacing: .14em; color: var(--texto-2); }
+  .vital .luz { width: 10px; height: 10px; border-radius: 50%; background: var(--texto-3); }
+  .vital .num { font-family: var(--mono); font-size: 70px; font-weight: 700; line-height: 1; margin-top: 16px; letter-spacing: -.02em; }
+  .vital .uni { font-family: var(--mono); font-size: 18px; color: var(--texto-2); margin-left: 8px; font-weight: 400; letter-spacing: 0; }
+  .vital .cab-der { display: inline-flex; align-items: center; gap: 12px; }
+  .vital .origen { padding: 3px 8px; font-size: 11px; }
+  .vital.ok .num { color: var(--texto); }
+  .vital.ok .luz { background: var(--ok); opacity: .8; }
+  .vital.warn .num { color: var(--warn); }
+  .vital.warn .luz { background: var(--warn); }
+  .vital.crit { border-color: rgba(240,72,72,.55); background: linear-gradient(180deg, rgba(240,72,72,.08), var(--panel)); }
+  .vital.crit .num { color: var(--crit); }
+  .vital.crit .luz { background: var(--crit); animation: parpadeo 1s steps(2) infinite; }
+  .vital.atenuado { opacity: .5; }
+  .vital.resaltado { border-color: var(--cian); box-shadow: 0 0 0 1px var(--cian) inset; }
+  .ecg { flex: 1; min-height: 150px; border-radius: 18px; background: #050b12; border: 1px solid var(--borde); position: relative; overflow: hidden; }
+  .ecg .cab { position: absolute; top: 14px; left: 20px; font-family: var(--mono); font-size: 15px; color: var(--ecg); letter-spacing: .08em; }
+  .ecg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  footer { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 13px; letter-spacing: .1em; color: var(--texto-3); }
+  footer .ctl.on { color: var(--ok); }
+
+  .qr-esquina { position: absolute; right: 24px; bottom: 58px; z-index: 15; display: flex; gap: 12px;
+    align-items: center; background: rgba(8,16,28,.96); border: 1px solid var(--borde-2);
+    border-radius: 14px; padding: 10px 14px 10px 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .qr-esquina.oculto { display: none; }
+  .qr-mini { background: #fff; border-radius: 9px; padding: 6px; width: 104px; height: 104px; }
+  .qr-mini svg { width: 100%; height: 100%; display: block; }
+  .qr-pie { display: flex; flex-direction: column; gap: 5px; max-width: 215px; }
+  .qr-pie b { font-size: 17px; color: var(--texto); line-height: 1.25; }
+  .qr-pie span { font-family: var(--mono); font-size: 13px; color: var(--texto-2); word-break: break-all; }
+
+  .desconectado { position: absolute; inset: 0; background: rgba(3,7,13,.82); display: none; align-items: center; justify-content: center; font-size: 30px; color: var(--warn); z-index: 20; font-family: var(--mono); letter-spacing: .1em; }
+  .desconectado.si { display: flex; }
+
+  @keyframes parpadeo { 50% { opacity: .2; } }
+  @keyframes pulso { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.2); opacity: 0; } }
+  @keyframes respirar { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.075, 1.05); } }
+  @keyframes latir { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.1); } 24% { transform: scale(.98); } 34% { transform: scale(1.05); } }
+  @keyframes gota { 0% { transform: translateY(-6px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(18px); opacity: 0; } }
+  @keyframes temblar { 0%,100% { transform: translate(0,0); } 25% { transform: translate(var(--amp), calc(var(--amp) * -.5)); } 50% { transform: translate(calc(var(--amp) * -1), 0); } 75% { transform: translate(calc(var(--amp) * .6), calc(var(--amp) * .5)); } }
+  .anim-resp { transform-box: fill-box; transform-origin: 50% 20%; animation: respirar 4s ease-in-out infinite; }
+  .anim-latir { transform-box: fill-box; transform-origin: center; animation: latir 1s ease-in-out infinite; }
+  .anim-gota { animation: gota 2.4s ease-in infinite; }
+  .anim-temblor { animation: temblar .18s linear infinite; }
+</style>
+</head>
+<body>
+<div id="escenario">
+  <header>
+    <div>
+      <div class="marca">SimClin · Monitor</div>
+      <h1 id="titulo">Caso clínico</h1>
+      <div class="sub" id="subtitulo">Paciente · —</div>
+    </div>
+    <div class="der">
+      <span class="chip demo" id="fuente"><span class="p"></span><span id="fuenteTxt">MODO DEMO</span></span>
+      <span class="tiempo" id="tiempo">T+ 00:00</span>
+      <span class="estado espera" id="estado"><span class="p"></span><span id="estadoTxt">EN ESPERA</span></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="izq">
+      <div class="vista activa" id="vistaEspera">
+        <div class="espera-caja">
+          <div class="qr" id="qr"></div>
+          <div class="espera-txt">
+            <h2>Esperando inicio del caso</h2>
+            <p>Un estudiante del grupo escanea este código con su celular para usarlo como control remoto.</p>
+            <p id="esperaDetalle">Desde el celular podrán ampliar en esta pantalla cada sistema del paciente mientras examinan el maniquí.</p>
+            <div class="url" id="urlControl">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vista" id="vistaGeneral">
+        <svg id="silueta" viewBox="0 0 240 520" aria-label="Vista general del paciente">
+          <g id="figura">
+            <circle class="contorno" id="figCabeza" cx="120" cy="58" r="40"/>
+            <path class="contorno" d="M108 96 L108 108 C82 112 64 124 60 150 L52 300 C51 316 66 318 68 302 L76 190 L80 190 L80 330 L86 498 C87 512 106 512 106 498 L112 348 L128 348 L134 498 C134 512 153 512 154 498 L160 330 L160 190 L164 190 L172 302 C174 318 189 316 188 300 L180 150 C176 124 158 112 132 108 L132 96 Z"/>
+            <circle class="marca-reg" cx="132" cy="160" r="11"/>
+            <path class="marca-reg" d="M74 196 C79 214 79 228 76 240"/>
+            <ellipse class="marca-reg" cx="120" cy="236" rx="26" ry="17"/>
+          </g>
+          <g id="pines"></g>
+        </svg>
+        <div class="etiqueta-vista">VISTA GENERAL</div>
+      </div>
+
+      <div class="vista" id="vistaSistema">
+        <div class="sis-izq">
+          <div class="sis-titulo" id="sisTitulo"></div>
+          <div class="sis-nombre" id="sisNombre"></div>
+          <div class="ilustracion" id="ilustracion"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="der">
+      <div class="grilla" id="grilla"></div>
+      <div class="ecg">
+        <div class="cab">II · 25 mm/s</div>
+        <canvas id="ecg"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span class="ctl" id="ctl">CONTROL REMOTO: SIN CELULAR CONECTADO</span>
+    <span>VALORES CLÍNICOS DE PRUEBA · PENDIENTES DE VALIDACIÓN POR TOXICOLOGÍA</span>
+  </footer>
+
+  <!-- QR de repuesto: aparece si el caso ya arrancó y ningún celular tiene el
+       control (se cayó la red, cambiaron de wifi, entró otro grupo). Así no
+       hay que reiniciar el caso para volver a emparejar el celular. -->
+  <div class="qr-esquina oculto" id="qrEsquina">
+    <div class="qr-mini" id="qrMini"></div>
+    <div class="qr-pie">
+      <b>Escanea para tomar el control</b>
+      <span id="urlEsquina">—</span>
+    </div>
+  </div>
+  <div class="desconectado" id="desconectado">RECONECTANDO CON EL SERVIDOR…</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three/three.module.js", "three/addons/": "/static/vendor/three/addons/" } }
+</script>
+<script type="module">
+  import { crearVisor } from "/static/visor3d.js";
+  window.__crearVisor = crearVisor;
+  window.dispatchEvent(new Event("visor3d-disponible"));
+</script>
+<script src="/static/qrcode.js"></script>
+<script src="/static/comun.js"></script>
+<script>
+const { conectar, reloj, ICONOS, mezclarColor, escapar, qrSVG } = SimClin;
+const $ = (id) => document.getElementById(id);
+
+/* --- escalar el lienzo 1920x1080 al tamaño real de la pantalla --- */
+function escalar() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  $("escenario").style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener("resize", escalar); escalar();
+
+const ORDEN_VITALES = ["fc", "ta", "spo2", "fr", "etco2", "temp"];
+const SIS_POR_SIGNO = { fc: "cardio", ta: "cardio", spo2: "torax", fr: "torax", etco2: "torax", temp: "neuro" };
+
+// Pines de la vista general: dónde aparece el indicador de cada sistema sobre la silueta
+const PINES = {
+  neuro:        { x: 120, y: 22,  lx: 175, ly: 22 },
+  cabeza:       { x: 146, y: 70,  lx: 200, ly: 78 },
+  torax:        { x: 102, y: 150, lx: 20,  ly: 140 },
+  cardio:       { x: 132, y: 160, lx: 205, ly: 165 },
+  abdomen:      { x: 120, y: 236, lx: 205, ly: 245 },
+  extremidades: { x: 60,  y: 300, lx: 14,  ly: 330 },
+};
+
+let estado = null;
+let sistemaDibujado = null;
+let vistaActual = null;
+
+/* ---------- construcción de la grilla de vitales (una vez) ---------- */
+(function crearGrilla() {
+  $("grilla").innerHTML = ORDEN_VITALES.map((k) => `
+    <div class="vital" id="v_${k}">
+      <div class="cab"><span id="vn_${k}">${k.toUpperCase()}</span><span class="cab-der"><span class="origen tag" id="vo_${k}">SIM</span><span class="luz"></span></span></div>
+      <div class="num"><span id="vv_${k}">--</span><span class="uni" id="vu_${k}"></span></div>
+    </div>`).join("");
+})();
+
+function mostrarVista(id) {
+  if (vistaActual === id) return;
+  vistaActual = id;
+  for (const v of ["vistaEspera", "vistaGeneral", "vistaSistema"]) $(v).classList.toggle("activa", v === id);
+}
+
+/* ---------- ilustraciones por sistema ---------- */
+const PIEL = "#d6a585";
+function colorPiel(vis) {
+  let c = mezclarColor(PIEL, "#d8ccc4", vis.palidez || 0);
+  c = mezclarColor(c, "#a9afc6", (vis.cianosis || 0) * 0.35);
+  return c;
+}
+function colorLabios(vis) { return mezclarColor("#c7676f", "#5a5da3", vis.cianosis || 0); }
+function colorUnas(vis) { return mezclarColor("#e7a3a0", "#6f74b2", vis.cianosis || 0); }
+function gotas(posiciones, escala) {
+  return posiciones.map(([x, y, d], i) =>
+    `<g transform="translate(${x} ${y}) scale(${escala})"><path class="anim-gota" style="animation-delay:${d}s" d="M0 -9 C4 -2 7 2 7 6 A7 7 0 0 1 -7 6 C-7 2 -4 -2 0 -9 Z" fill="#cfe9ff" fill-opacity=".85" stroke="#9fd0f5" stroke-width="1"/></g>`
+  ).join("");
+}
+
+const ILUSTRACIONES = {
+  cabeza: () => `
+    <svg viewBox="0 0 400 480">
+      <defs>
+        <clipPath id="ojoI"><ellipse cx="148" cy="212" rx="36" ry="21"/></clipPath>
+        <clipPath id="ojoD"><ellipse cx="252" cy="212" rx="36" ry="21"/></clipPath>
+      </defs>
+      <rect x="150" y="360" width="100" height="110" rx="30" fill="${PIEL}" id="cuello"/>
+      <ellipse cx="68" cy="232" rx="20" ry="36" fill="${PIEL}" class="piel"/>
+      <ellipse cx="332" cy="232" rx="20" ry="36" fill="${PIEL}" class="piel"/>
+      <ellipse cx="200" cy="222" rx="134" ry="170" fill="${PIEL}" class="piel" id="cara"/>
+      <path d="M72 180 C70 90 130 44 200 44 C278 44 332 92 328 182 C318 128 282 104 246 112 C214 88 170 86 140 110 C110 104 84 130 72 180 Z" fill="#2b2320"/>
+      <path d="M112 172 Q148 158 182 170" stroke="#3a2c26" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M218 170 Q252 158 288 172" stroke="#3a2c26" stroke-width="7" fill="none" stroke-linecap="round"/>
+      ${["I", "D"].map((l) => {
+        const cx = l === "I" ? 148 : 252;
+        return `<g clip-path="url(#ojo${l})">
+          <rect x="${cx - 40}" y="188" width="80" height="50" fill="#f6f3ef"/>
+          <circle cx="${cx}" cy="212" r="19" fill="#6a4a2e"/>
+          <circle cx="${cx}" cy="212" r="19" fill="none" stroke="#3d2a19" stroke-width="2"/>
+          <circle cx="${cx}" cy="212" r="11" fill="#0b0b0b" class="pupila"/>
+          <circle cx="${cx + 6}" cy="206" r="3.2" fill="#fff" opacity=".85"/>
+          <rect x="${cx - 40}" y="186" width="80" height="0" fill="${PIEL}" class="parpado piel"/>
+        </g>
+        <ellipse cx="${cx}" cy="212" rx="36" ry="21" fill="none" stroke="#7a5845" stroke-width="2.2"/>`;
+      }).join("")}
+      <path d="M200 218 C194 250 186 272 184 286 C192 294 208 294 216 286 C214 272 206 250 200 218 Z" fill="#000" opacity=".07"/>
+      <path d="M184 288 C192 296 208 296 216 288" stroke="#8c6450" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path id="labios" d="M152 326 C170 314 188 318 200 322 C212 318 230 314 248 326 C232 348 214 354 200 354 C186 354 168 348 152 326 Z" fill="#c7676f"/>
+      <path d="M154 327 C176 334 224 334 246 327" stroke="#000" stroke-opacity=".25" stroke-width="2.4" fill="none"/>
+      <g id="sudor" opacity="0">${gotas([[130, 120, 0], [210, 108, .8], [276, 128, 1.5], [104, 262, .4], [296, 270, 1.1], [240, 290, 1.9]], 1.5)}</g>
+    </svg>`,
+
+  torax: () => `
+    <svg viewBox="0 0 400 480">
+      <path d="M70 110 C110 80 150 70 200 70 C250 70 290 80 330 110 L346 420 C300 450 100 450 54 420 Z" fill="rgba(34,195,230,.04)" stroke="#23465e" stroke-width="2"/>
+      ${[150, 190, 230, 270, 310].map((y) => `<path d="M92 ${y} Q200 ${y + 26} 308 ${y}" stroke="#1d3a50" stroke-width="2" fill="none"/>`).join("")}
+      <path d="M200 60 L200 160 M200 160 L168 196 M200 160 L232 196" stroke="#8fb9cf" stroke-width="10" stroke-linecap="round" fill="none"/>
+      <g id="pulmones" class="anim-resp">
+        <path id="pulmonI" d="M186 182 C150 170 110 206 100 270 C92 324 100 380 130 398 C156 410 182 396 188 368 Z" fill="#e57a7a" stroke="#b25a5a" stroke-width="2"/>
+        <path id="pulmonD" d="M214 182 C250 170 290 206 300 270 C308 324 300 380 270 398 C244 410 218 396 212 368 Z" fill="#e57a7a" stroke="#b25a5a" stroke-width="2"/>
+      </g>
+      <text x="200" y="462" text-anchor="middle" fill="#8a9bb0" font-family="JetBrains Mono, Consolas, monospace" font-size="18" id="txtResp">—</text>
+    </svg>`,
+
+  cardio: () => `
+    <svg viewBox="0 0 400 480">
+      <circle cx="200" cy="220" r="170" fill="rgba(240,72,72,.04)" stroke="#23465e" stroke-width="2" stroke-dasharray="4 8"/>
+      <g id="corazon" class="anim-latir">
+        <path d="M200 360 C120 300 70 250 70 186 C70 138 106 104 150 104 C174 104 190 116 200 134 C210 116 226 104 250 104 C294 104 330 138 330 186 C330 250 280 300 200 360 Z" fill="#d34a4f" stroke="#8e2a2f" stroke-width="3"/>
+        <path d="M150 150 C140 170 138 196 150 220" stroke="#fff" stroke-opacity=".25" stroke-width="10" fill="none" stroke-linecap="round"/>
+      </g>
+      <text x="200" y="440" text-anchor="middle" fill="#8a9bb0" font-family="JetBrains Mono, Consolas, monospace" font-size="18" id="txtLatido">—</text>
+    </svg>`,
+
+  abdomen: () => `
+    <svg viewBox="0 0 400 480">
+      <path d="M96 60 C80 150 84 220 98 270 C84 330 92 390 122 440 L278 440 C308 390 316 330 302 270 C316 220 320 150 304 60 Z" fill="${PIEL}" fill-opacity=".85" stroke="#8c6450" stroke-width="2" class="piel"/>
+      <line x1="200" y1="90" x2="200" y2="420" stroke="#6b4a3a" stroke-opacity=".45" stroke-width="2" stroke-dasharray="8 8"/>
+      <line x1="100" y1="250" x2="300" y2="250" stroke="#6b4a3a" stroke-opacity=".45" stroke-width="2" stroke-dasharray="8 8"/>
+      <circle cx="200" cy="262" r="6" fill="#8c6450"/>
+      <g transform="translate(236 290)">
+        <circle r="46" fill="#0c1624" stroke="#22c3e6" stroke-width="2"/>
+        <g transform="translate(-24 -24) scale(2)" color="#22c3e6">${ICONOS.estetoscopio.replace("<svg ", '<svg width="24" height="24" ')}</g>
+      </g>
+      <text x="200" y="472" text-anchor="middle" fill="#22c3e6" font-family="JetBrains Mono, Consolas, monospace" font-size="17">AUSCULTAR EN EL MANIQUÍ</text>
+    </svg>`,
+
+  extremidades: () => `
+    <svg viewBox="0 0 400 480">
+      <g id="mano" class="anim-temblor" style="--amp:0px">
+        <path d="M150 470 L150 300 C150 290 144 282 136 276 L92 236 C80 224 82 206 96 200 C108 194 120 200 128 210 L158 244 L158 110 C158 96 168 88 180 88 C192 88 202 96 202 110 L202 206 L202 80 C202 66 212 58 224 58 C236 58 246 66 246 80 L246 206 L246 100 C246 86 256 78 268 78 C280 78 290 86 290 100 L290 214 L290 138 C290 126 300 118 310 118 C322 118 330 126 330 138 L330 300 C330 360 300 400 270 420 L270 470 Z" fill="${PIEL}" stroke="#8c6450" stroke-width="2.5" class="piel"/>
+        ${[[180, 100], [224, 70], [268, 90], [310, 128], [104, 212]].map(([x, y], i) =>
+          `<rect class="una" x="${x - 12}" y="${y - 6}" width="24" height="26" rx="10" fill="#e7a3a0" stroke="#8c6450" stroke-width="1.4" ${i === 4 ? `transform="rotate(-48 ${x} ${y})"` : ""}/>`).join("")}
+        <g id="marcas" opacity="0">
+          ${[[196, 440], [212, 452], [226, 438], [206, 426]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.5" fill="#6d2f3a"/><circle cx="${x}" cy="${y}" r="8" fill="#7b4f8a" fill-opacity=".22"/>`).join("")}
+        </g>
+        <g id="sudorMano" opacity="0">${gotas([[200, 300, 0], [260, 330, .9], [290, 250, 1.6], [180, 380, .5]], 1.2)}</g>
+      </g>
+    </svg>`,
+
+  neuro: () => `
+    <svg viewBox="0 0 400 480">
+      <path d="M200 90 C170 60 118 66 104 104 C70 106 52 142 64 172 C40 190 42 232 70 248 C62 282 88 310 122 306 C136 336 176 344 200 322 C224 344 264 336 278 306 C312 310 338 282 330 248 C358 232 360 190 336 172 C348 142 330 106 296 104 C282 66 230 60 200 90 Z" fill="rgba(34,195,230,.06)" stroke="#2aa9c9" stroke-width="3"/>
+      <path d="M200 92 L200 320" stroke="#2aa9c9" stroke-width="2.5"/>
+      <path d="M120 150 C140 140 160 160 150 180 M100 214 C124 204 144 222 136 244 M280 150 C260 140 240 160 250 180 M300 214 C276 204 256 222 264 244 M160 270 C176 262 186 280 180 294 M240 270 C224 262 214 280 220 294" stroke="#2aa9c9" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".7"/>
+      <text x="200" y="400" text-anchor="middle" fill="#e6edf5" font-family="JetBrains Mono, Consolas, monospace" font-size="54" font-weight="700" id="txtGlasgow">15/15</text>
+      <text x="200" y="436" text-anchor="middle" fill="#8a9bb0" font-family="JetBrains Mono, Consolas, monospace" font-size="18">ESCALA DE GLASGOW</text>
+    </svg>`,
+};
+
+let ultimaDuracion = {};
+function ponerDuracion(el, clave, seg) {
+  if (!el) return;
+  const prev = ultimaDuracion[clave];
+  if (prev && Math.abs(prev - seg) / prev < 0.06) return; // evitar reiniciar la animación por cambios mínimos
+  ultimaDuracion[clave] = seg;
+  el.style.animationDuration = seg.toFixed(2) + "s";
+}
+
+function actualizarIlustracion(id, e) {
+  const vis = e.visual;
+  const cont = $("ilustracion");
+  const piel = colorPiel(vis);
+  cont.querySelectorAll(".piel").forEach((n) => n.setAttribute("fill", piel));
+  if (id === "cabeza") {
+    cont.querySelectorAll(".pupila").forEach((p) => p.setAttribute("r", (vis.pupila_mm * 2.9).toFixed(1)));
+    cont.querySelectorAll(".parpado").forEach((p) => p.setAttribute("height", (vis.parpados * 44).toFixed(1)));
+    $("labios").setAttribute("fill", colorLabios(vis));
+    $("sudor").setAttribute("opacity", vis.sudor);
+    $("cuello").setAttribute("fill", piel);
+  } else if (id === "torax") {
+    const fr = e.vitales.fr.valor, sat = e.vitales.spo2.valor;
+    const t = Math.max(0, Math.min(1, (97 - sat) / 17));
+    const c = mezclarColor("#e57a7a", "#8a8fb8", t);
+    $("pulmonI").setAttribute("fill", c); $("pulmonD").setAttribute("fill", c);
+    ponerDuracion($("pulmones"), "resp", 60 / Math.max(fr, 2));
+    $("txtResp").textContent = `${e.vitales.fr.texto} RESPIRACIONES POR MINUTO`;
+  } else if (id === "cardio") {
+    const fc = e.vitales.fc.valor;
+    ponerDuracion($("corazon"), "fc", 60 / Math.max(fc, 20));
+    $("txtLatido").textContent = `${e.vitales.fc.texto} LATIDOS POR MINUTO`;
+  } else if (id === "extremidades") {
+    cont.querySelectorAll(".una").forEach((u) => u.setAttribute("fill", colorUnas(vis)));
+    $("marcas").setAttribute("opacity", vis.marcas);
+    $("sudorMano").setAttribute("opacity", vis.sudor);
+    $("mano").style.setProperty("--amp", (vis.temblor * 3.2).toFixed(2) + "px");
+  } else if (id === "neuro") {
+    const s = e.sistemas.find((x) => x.id === "neuro");
+    const g = s.hallazgos.find((h) => h.nombre === "Glasgow");
+    if (g) {
+      $("txtGlasgow").textContent = g.texto.replace(/\s/g, "");
+      $("txtGlasgow").setAttribute("fill", g.severidad === "crit" ? "#f04848" : g.severidad === "warn" ? "#f5a524" : "#e6edf5");
+    }
+  }
+}
+
+/* ---------- render principal ---------- */
+function render(e) {
+  estado = e;
+  // Modo "solo imagen": lo prende el facilitador, o la tecla V en este mismo
+  // computador. Los visores se reajustan solos (tienen ResizeObserver).
+  $("escenario").classList.toggle("sin-vitales", !!e.ocultar_vitales);
+  $("titulo").textContent = e.diagnostico ? e.diagnostico : `${e.codigo} · Paciente en urgencias`;
+  $("subtitulo").textContent = `Paciente · ${e.paciente} · ${e.motivo}`;
+  $("tiempo").textContent = "T+ " + reloj(e.transcurrido_s);
+
+  const est = $("estado");
+  const clase = { "CRÍTICO": "crit", "ALERTA": "warn", "ESTABLE": "ok" }[e.estado_paciente] || "espera";
+  est.className = "estado " + clase;
+  $("estadoTxt").textContent = e.estado_paciente;
+
+  const f = $("fuente");
+  f.className = "chip " + (e.datos_reales ? "real" : "demo");
+  $("fuenteTxt").textContent = e.datos_reales ? "DATOS REALES DEL SIMULADOR" : "MODO DEMO · VALORES SIMULADOS";
+
+  const ctl = $("ctl");
+  ctl.classList.toggle("on", !!e.controlador);
+  ctl.textContent = e.controlador ? "● CONTROL REMOTO CONECTADO" : "CONTROL REMOTO: SIN CELULAR CONECTADO";
+
+  // vitales
+  const sel = e.sistema_seleccionado;
+  for (const k of ORDEN_VITALES) {
+    const v = e.vitales[k];
+    const card = $("v_" + k);
+    const activo = e.iniciado;
+    card.className = "vital " + (activo ? v.severidad : "") +
+      (sel && activo ? (SIS_POR_SIGNO[k] === sel ? " resaltado" : " atenuado") : "");
+    $("vn_" + k).textContent = v.nombre.toUpperCase();
+    $("vv_" + k).textContent = activo ? v.texto : "--";
+    $("vu_" + k).textContent = v.unidad;
+    const o = $("vo_" + k);
+    o.className = "origen tag " + (v.origen === "real" ? "real" : "");
+    o.textContent = v.origen === "real" ? "REAL" : "SIM";
+  }
+
+  // dirección que va en los códigos QR (la escoge el facilitador en su panel)
+  const urlCtl = e.url_control || (e.urls && e.urls.control && e.urls.control[0]) || location.origin + "/control";
+
+  // QR de repuesto en la esquina: solo si el caso ya arrancó y nadie tiene el control
+  const mostrarEsquina = e.iniciado && !e.controlador;
+  $("qrEsquina").classList.toggle("oculto", !mostrarEsquina);
+  if (mostrarEsquina && $("urlEsquina").textContent !== urlCtl) {
+    $("urlEsquina").textContent = urlCtl;
+    $("qrMini").innerHTML = qrSVG(urlCtl, 104);
+  }
+
+  // vista izquierda
+  if (!e.iniciado) {
+    mostrarVista("vistaEspera");
+    const url = urlCtl;
+    // El texto cambia según lo que de verdad se pueda abrir hoy
+    $("esperaDetalle").textContent = e.solo_modelados === false
+      ? "Desde el celular podrán ampliar en esta pantalla cada sistema del paciente."
+      : "Desde el celular podrán acercarse a la cara del paciente en esta pantalla: cara completa, labios y ojos.";
+    if ($("urlControl").textContent !== url) {
+      $("urlControl").textContent = url;
+      $("qr").innerHTML = qrSVG(url, 300);
+    }
+    sistemaDibujado = null;
+  } else if (!sel) {
+    mostrarVista("vistaGeneral");
+    renderPines(e);
+    $("figCabeza").style.fill = mezclarColor("#0f2a38", "#23305a", e.visual.cianosis || 0);
+    sistemaDibujado = null;
+  } else {
+    const s = e.sistemas.find((x) => x.id === sel);
+    if (sistemaDibujado !== sel) {
+      ultimaDuracion = {};
+      $("sisTitulo").innerHTML = `${ICONOS[s.icono] || ""}<span>SISTEMA AMPLIADO</span>`;
+      $("sisNombre").textContent = s.nombre;
+      if (s.modelo3d) {
+        montarVisor3D();
+      } else {
+        soltarVisor3D();
+        $("ilustracion").innerHTML = ILUSTRACIONES[sel] ? ILUSTRACIONES[sel]() : "";
+      }
+      sistemaDibujado = sel;
+    }
+    if (s.modelo3d) actualizarVisor3D(e);
+    else actualizarIlustracion(sel, e);
+    // Los hallazgos NO se escriben en el televisor: nombrar el signo
+    // ("pupilas puntiformes", "cianosis marcada") es regalarle el diagnóstico
+    // al estudiante. Tienen que verlo. El facilitador sí los ve en su panel.
+    mostrarVista("vistaSistema");
+  }
+}
+
+function renderPines(e) {
+  let html = "";
+  for (const s of e.sistemas) {
+    const p = PINES[s.id];
+    if (!p) continue;
+    // No marcar en la silueta sistemas a los que el celular no puede entrar
+    if (s.disponible === false) continue;
+    const n = s.criticos || s.alertas;
+    if (!n) continue;
+    const color = s.criticos ? "#f04848" : "#f5a524";
+    html += `<g class="pin">
+      <line x1="${p.x}" y1="${p.y}" x2="${p.lx}" y2="${p.ly}" stroke="${color}" stroke-opacity=".5" stroke-width="1"/>
+      <circle class="anillo" cx="${p.x}" cy="${p.y}" r="6" fill="${color}" opacity=".6"/>
+      <circle cx="${p.x}" cy="${p.y}" r="5" fill="${color}"/>
+      <rect x="${p.lx - 16}" y="${p.ly - 11}" width="32" height="22" rx="11" fill="#0c1624" stroke="${color}"/>
+      <text x="${p.lx}" y="${p.ly + 4.5}" text-anchor="middle" fill="${color}">${n}</text>
+    </g>`;
+  }
+  $("pines").innerHTML = html;
+}
+
+/* ---------- trazo de ECG (barrido tipo monitor) ---------- */
+(function ecg() {
+  const cv = $("ecg"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, x = 0, yPrev = null, tBeat = 0, last = performance.now();
+  function tam() {
+    const r = cv.getBoundingClientRect(), s = r.width / cv.offsetWidth || 1;
+    W = cv.width = cv.offsetWidth * 2; H = cv.height = cv.offsetHeight * 2;
+    ctx.fillStyle = "#050b12"; ctx.fillRect(0, 0, W, H);
+  }
+  new ResizeObserver(tam).observe(cv); tam();
+  function onda(t) { // t: segundos desde el inicio del latido
+    const g = (c, w, a) => a * Math.exp(-((t - c) ** 2) / (2 * w * w));
+    return g(0.10, 0.025, 0.12) - g(0.195, 0.008, 0.12) + g(0.215, 0.011, 1.0) - g(0.24, 0.01, 0.28) + g(0.44, 0.045, 0.25);
+  }
+  function paso(ahora) {
+    const dt = Math.min(0.05, (ahora - last) / 1000); last = ahora;
+    const activo = estado && estado.iniciado;
+    const fc = activo ? Math.max(20, estado.vitales.fc.valor) : 0;
+    const periodo = fc ? 60 / fc : 1e9;
+    const vel = W / 5.2; // la pantalla muestra ~5 s de trazo
+    const pasos = 4;
+    for (let i = 0; i < pasos; i++) {
+      tBeat += dt / pasos;
+      if (tBeat > periodo) tBeat -= periodo;
+      const nx = x + (vel * dt) / pasos;
+      const y = H * 0.62 - (activo ? onda(tBeat) : 0) * H * 0.45;
+      ctx.fillStyle = "#050b12"; ctx.fillRect(nx, 0, 26, H);
+      if (yPrev !== null && nx > x) {
+        ctx.strokeStyle = "#2bd46b"; ctx.lineWidth = 3.2; ctx.lineJoin = "round";
+        ctx.beginPath(); ctx.moveTo(x, yPrev); ctx.lineTo(nx, y); ctx.stroke();
+      }
+      x = nx; yPrev = y;
+      if (x > W) { x = 0; yPrev = null; }
+    }
+    requestAnimationFrame(paso);
+  }
+  requestAnimationFrame(paso);
+})();
+
+/* ---------- visor 3D (modelo del maniquí, repo de Juan) ---------- */
+let visor = null, visorSub = null, esquemaPupila = null, visorPendiente = false;
+
+function montarVisor3D() {
+  $("ilustracion").innerHTML = `
+    <div class="visor3d" id="visor3d" data-estado="cargando">
+      <div class="marca3d">MODELO 3D</div>
+      <div class="cargando">CARGANDO MODELO…</div>
+      <div class="esquema-pupila" id="esquemaPupila" hidden>
+        <svg viewBox="0 0 170 62">
+          <ellipse cx="85" cy="31" rx="52" ry="26" fill="#f6f3ef" stroke="#7a5845" stroke-width="2"/>
+          <circle cx="85" cy="31" r="20" fill="#6a4a2e"/>
+          <circle id="pupilaEsq" cx="85" cy="31" r="10" fill="#0b0b0b"/>
+          <circle cx="92" cy="25" r="3" fill="#fff" opacity=".85"/>
+        </svg>
+        <div class="txt" id="txtPupila">PUPILA —</div>
+      </div>
+    </div>`;
+  esquemaPupila = $("esquemaPupila");
+  if (window.__crearVisor) {
+    visor = window.__crearVisor($("visor3d"));
+    visorSub = null;
+  } else if (!visorPendiente) {
+    visorPendiente = true;
+    addEventListener("visor3d-disponible", () => {
+      visorPendiente = false;
+      if ($("visor3d")) { visor = window.__crearVisor($("visor3d")); visorSub = null; }
+    }, { once: true });
+  }
+}
+
+function soltarVisor3D() { visor = null; visorSub = null; esquemaPupila = null; }
+
+function actualizarVisor3D(e) {
+  // Si el modelo no cargó (archivo movido, tarjeta gráfica vieja), se vuelve
+  // al dibujo 2D en vez de dejar la pantalla vacía.
+  const caja = $("visor3d");
+  if (caja && caja.dataset.estado === "error") {
+    soltarVisor3D();
+    $("ilustracion").innerHTML = ILUSTRACIONES.cabeza();
+    actualizarIlustracion("cabeza", e);
+    return;
+  }
+  if (!visor) return;
+  visor.aplicarEstado(e.visual);
+  const sub = e.subvista || "cara";
+  if (sub !== visorSub) {
+    visor.irAVista(sub, visorSub === null);
+    visorSub = sub;
+  }
+  // Los ojos ya vienen montados en la cabeza, así que la vista de pupilas es
+  // un acercamiento a la cara real. El esquema 2D queda solo como respaldo si
+  // el modelo no carga (ese caso se atiende arriba, volviendo a la ilustración).
+  if (esquemaPupila) esquemaPupila.hidden = true;
+}
+
+// Atajo para quien esté en el computador del televisor: V esconde o muestra
+// los signos vitales sin tener que ir al panel del facilitador.
+addEventListener("keydown", (ev) => {
+  if (ev.key !== "v" && ev.key !== "V") return;
+  fetch("/api/facilitador", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accion: "ocultar_vitales", valor: !(estado && estado.ocultar_vitales) }),
+  });
+});
+
+conectar("monitor", null, render, (ok) => $("desconectado").classList.toggle("si", !ok));
+</script>
+</body>
+</html>

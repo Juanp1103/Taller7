@@ -1,0 +1,4 @@
+# Registros de sesiones de prueba: son datos de cada corrida, no código
+registros/*.jsonl
+__pycache__/
+*.pyc

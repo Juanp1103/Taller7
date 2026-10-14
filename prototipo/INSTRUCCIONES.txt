@@ -1,0 +1,448 @@
+SIMCLIN — PROTOTIPO PARA PRUEBAS DE USUARIO
+===========================================
+
+QUÉ ES
+------
+El diseño de Figma Make convertido en un prototipo que funciona de verdad con
+dos dispositivos, con el modelo 3D del maniquí de Juan integrado:
+
+  - MONITOR (televisor del salón): paciente, signos vitales, ECG y el sistema
+    que el grupo esté examinando. En "Cabeza y Cuello" se muestra el MODELO
+    3D (el .glb del repo de Juan) y la cámara vuela a la cara, los labios o
+    los ojos según lo que toquen en el celular.
+  - CONTROL REMOTO (celular de un estudiante): la lista de sistemas. Al tocar
+    uno, se amplía en el televisor al instante.
+  - FACILITADOR (el computador de quien corre la prueba): elige el caso, lo
+    inicia, controla la evolución en modo demo y anota observaciones.
+
+Necesita Python 3 O Node.js en el computador (cualquiera de los dos sirve;
+el mismo servidor está escrito en los dos lenguajes). No necesita internet.
+
+
+CÓMO ARRANCARLO (computador del salón, Windows)
+------------------------------------------------
+1. Copien la carpeta "simclin" completa al computador que manda imagen al
+   televisor.
+2. Doble clic en INICIAR.bat
+   - Se abre una ventana negra con las direcciones (no la cierren).
+   - Se abre el panel del facilitador en el navegador.
+   - La primera vez, Windows puede preguntar por el firewall: marquen
+     "Redes privadas" Y "Redes públicas" y den Permitir. Si no, el celular
+     no va a poder conectarse.
+3. En el televisor (pantalla extendida) abran:  http://localhost:8080/monitor
+   y pongan pantalla completa con F11.
+4. En el celular del estudiante: escanear el código QR que aparece en el
+   televisor (o escribir la dirección que muestra la ventana negra, algo como
+   http://192.168.X.X:8080/control).
+   Si el computador está en varias redes a la vez, el panel del facilitador
+   tiene una lista "Dirección para el celular" para escoger cuál va en el QR.
+5. Si el celular escanea y no carga: es el wifi de la universidad, no el
+   prototipo. Lean la sección del wifi más abajo y corran PUNTO_DE_ACCESO.bat
+
+Para detener: cerrar la ventana negra (o Ctrl + C).
+
+
+SI SALE "Python was not found" AL ABRIR INICIAR.bat
+----------------------------------------------------
+Windows trae un atajo falso llamado python.exe que solo abre la Microsoft
+Store: por eso parece que Python está instalado cuando no lo está.
+
+  Opción A (la más rápida si ya hay Node): no hagan nada. INICIAR.bat ahora
+  detecta eso y arranca solo con Node.js (servidor.js hace exactamente lo
+  mismo que servidor.py).
+
+  Opción B - instalar Python:
+    1. https://www.python.org/downloads/ -> botón amarillo "Download Python".
+    2. Al abrir el instalador, MARCAR "Add python.exe to PATH" antes de
+       darle "Install Now". Ese paso es el que casi siempre se olvida.
+    3. Cerrar la ventana negra y volver a abrir INICIAR.bat
+
+  Opción C - instalar Node.js: https://nodejs.org (versión LTS) y listo.
+
+  Si instalaron Python y AÚN así dice que no lo encuentra, apaguen el atajo:
+  Configuración > Aplicaciones > Configuración avanzada de aplicaciones >
+  Alias de ejecución de aplicaciones > apagar python.exe y python3.exe
+
+  Para forzar uno u otro a mano, desde la carpeta:
+       python servidor.py        (o  py -3 servidor.py)
+       node servidor.js
+
+
+SI EL CELULAR ESCANEA EL QR Y NO CARGA NADA  (el wifi de la U)
+--------------------------------------------------------------
+Esto es lo que pasó en el salón: en casa funciona y en la universidad no.
+No es un error del prototipo. Las redes universitarias traen prendido el
+"aislamiento de clientes": dejan salir a internet pero NO dejan que dos
+aparatos conectados a esa misma red se vean entre sí. El celular pide
+http://10.x.x.x:8080/control, la red bota la petición y el celular se queda
+cargando para siempre.
+
+La salida es armar una red chiquita propia, solo para la prueba. El celular
+NO necesita internet: solo necesita ver al computador. Pruébenlo en este
+orden y párense en el primero que funcione.
+
+  PLAN A - punto de acceso del computador (el más rápido)
+    1. Con INICIAR.bat ya corriendo, doble clic en PUNTO_DE_ACCESO.bat
+       (está en la misma carpeta). Prende el punto de acceso de Windows,
+       les muestra el nombre de la red y la contraseña, y les dice la
+       dirección nueva, que empieza por 192.168.137.
+    2. Conecten el celular del control a esa red.
+    3. En el panel del facilitador, en "Dirección para el celular",
+       seleccionen la que dice 192.168.137. El QR del televisor cambia
+       solo. No hay que reiniciar el servidor.
+    4. Escaneen de nuevo.
+    Si el computador del salón no deja prender el punto de acceso (algunos
+    equipos administrados lo bloquean), pasen al plan B.
+
+  PLAN B - punto de acceso de un celular (funciona casi siempre)
+    Es el plan A al revés: el que comparte la red es un celular.
+    1. En un celular (puede ser el del control o el de otro del grupo):
+       Compartir internet / Zona wifi / Hotspot -> prender.
+    2. Conecten el COMPUTADOR del salón a esa red wifi.
+    3. Conecten el celular del control a la misma red (si el que comparte
+       es el mismo celular del control, ya está: no hace falta nada más).
+    4. En el panel del facilitador escojan la dirección nueva (suele
+       empezar por 192.168.43. o 192.168.137.) y escaneen el QR.
+    No gasta datos: todo el tráfico es entre los dos aparatos, no sale a
+    internet. Ojo: el televisor sigue conectado por cable al computador,
+    así que cambiar de wifi no afecta la imagen.
+
+  PLAN C - cable USB
+    Conecten el celular al computador por USB y prendan "Anclaje a red por
+    USB" / "USB tethering" en el celular. Windows crea una red entre los dos
+    al instante. Después escojan la dirección nueva en el panel. Es el plan
+    más confiable pero deja el celular amarrado al computador, así que sirve
+    para probar que el prototipo funciona, no para la prueba de usuario (el
+    estudiante tiene que poder caminar con el celular).
+
+  PLAN D - sin celular (último recurso, solo para no perder la sesión)
+    Abran http://localhost:8080/control en una segunda ventana del
+    computador y pónganla en un portátil o en otra pantalla al lado del
+    grupo. La prueba sigue siendo útil para evaluar el contenido y la
+    lectura del televisor, pero QUEDA ANULADO todo lo que tenga que ver con
+    el celular (supuestos S2, S4, S9 y las tareas T1 y T7 de la prueba de
+    usuario). Anótenlo en la hoja de observación: los datos de ese grupo no
+    son comparables con los demás en esos puntos.
+
+REVISAR ANTES DE CULPAR A LA RED
+  - El firewall: la primera vez Windows pregunta; hay que marcar "Redes
+    privadas" Y "Redes públicas". Si le dieron Cancelar, vuelvan a correr
+    PUNTO_DE_ACCESO.bat con clic derecho > "Ejecutar como administrador":
+    crea la regla del puerto 8080 solo.
+  - Que la dirección del QR sea la de la red donde está el celular. Si el
+    computador está en dos redes a la vez (cable + wifi, o wifi + punto de
+    acceso) hay varias direcciones y el panel deja escoger; la ventana
+    negra y el panel marcan cuál es cuál.
+  - Que no estén escaneando un QR viejo de una foto o de una captura.
+  - Prueba rápida de 10 segundos: en el celular, conectado a la red del
+    plan A o B, escriban a mano  http://192.168.137.1:8080/control
+    Si carga, el problema era el QR; si no, era la red.
+
+ANTES DE LA PRUEBA CON ESTUDIANTES
+  Vayan al salón real 20 minutos antes y dejen la red funcionando (plan A o
+  B) con el celular ya conectado y el QR escaneado. Esto es exactamente la
+  pregunta abierta del Flujo B, y ya tiene respuesta: en la red de la
+  universidad el flujo del QR no sirve tal cual, hay que montar la red
+  aparte. Vale la pena anotarlo como hallazgo: si el producto final va a
+  vivir en salones de la universidad, el MVP necesita su propio punto de
+  acceso (un router pequeño en el salón) y no depender del wifi
+  institucional.
+
+
+DATOS REALES VS. MODO DEMO
+--------------------------
+  - Si el lector de la carpeta "lector_monitor" está corriendo en el mismo
+    computador (python capture_ocr.py --live), el prototipo lo detecta solo:
+    el monitor muestra "DATOS REALES DEL SIMULADOR", la FC y la FR llevan la
+    etiqueta REAL, y la evolución del paciente (pupilas, labios, sudor,
+    hallazgos) se calcula a partir de ese dato real. El profesor controla
+    todo desde LLEAP como siempre.
+  - Si no hay lector, arranca en MODO DEMO (aviso amarillo, etiquetas SIM) y
+    el facilitador maneja la evolución desde su panel:
+      · "Progresión automática": el paciente empeora solo en X minutos.
+      · "Simular mejoría (naloxona)": revierte el cuadro en ~45 s.
+      · El deslizador pone la intensidad exacta.
+  - Hoy el lector solo lee FC y FR. TA, SpO2, EtCO2 y T° siempre salen como
+    SIM hasta que se calibren sus recuadros en roi_config.json.
+
+
+SOLO LA CARA (ASÍ ESTÁ HOY)
+---------------------------
+De todo el cuerpo, lo único que existe en 3D es la cabeza. Por eso el celular
+solo deja entrar a "Cabeza y Cuello", con sus tres acercamientos (cara
+completa, labios, ojos), y la silueta del televisor solo marca la cabeza.
+Tórax, abdomen, cardiovascular, extremidades y neurológico siguen existiendo
+en el contenido clínico, pero no se listan: no tiene sentido que un
+estudiante entre a un sistema que no está modelado.
+
+Para volver a mostrarlos (con las ilustraciones 2D) hay una casilla en el
+panel del facilitador: "Solo los sistemas que ya tienen modelo 3D". Al
+apagarla reaparecen los seis. Sirve para el día que el diseñador entregue el
+resto del cuerpo, o para una demo donde quieran enseñar todo el alcance.
+
+Ojo con la prueba de usuario: con un solo sistema disponible, las tareas que
+medían en qué orden exploran los sistemas y por qué (T3 y la comparación C1
+del conteo de críticos) dejan de tener sentido tal cual. Lo que sí se puede
+medir bien hoy es si entienden que la pantalla se maneja desde el celular, si
+relacionan lo que ven en la cara con el estado del paciente, y si los tres
+acercamientos les sirven o les estorban.
+
+
+SIGNOS FÍSICOS A MANO (para el profesor)
+-----------------------------------------
+En el panel del facilitador, dentro de "Evolución del paciente", están los
+siete signos físicos que el escenario calcula, cada uno con su deslizador:
+
+  Pupilas               0,8 a 9 mm   ojos en 3D
+  Cianosis              0 a 100 %    labios y piel · cara 3D y 2D
+  Palidez               0 a 100 %    piel · cara 3D y 2D
+  Sudoración            0 a 100 %    gotas y brillo · cara 3D, mano 2D
+  Temblor               0 a 100 %    solo extremidades (2D)
+  Párpados caídos       0 a 100 %    solo cara 2D
+  Marcas de venopunción 0 a 100 %    solo extremidades (2D)
+
+No hay nada inventado: son exactamente los parámetros que ya existían en
+escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
+fijarlos a mano.
+
+Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
+sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
+automático. El botón "auto" de cada fila suelta ese solo; "Todo en
+automático" los suelta todos; reiniciar también, así que cada grupo arranca
+igual sin que nadie se acuerde de bajarlos.
+
+La columna de la derecha dice dónde se nota cada uno, y conviene leerla: hoy
+el celular solo deja entrar a la cabeza y la cabeza se dibuja con el modelo
+3D, así que TEMBLOR y MARCAS (que viven en la mano) y PÁRPADOS CAÍDOS (que
+vive en la cara 2D) no se van a ver a menos que apaguen la casilla "Solo los
+sistemas que ya tienen modelo 3D". Se dejaron igual para que estén listos
+cuando el resto del cuerpo exista.
+
+Sirven también con el lector conectado. De hecho ahí es donde más sirven,
+porque el monitor real no reporta nada de esto y los demás controles quedan
+desactivados: son los únicos signos que el profesor puede mover en vivo.
+
+Cada cambio queda en el registro de la sesión (visual_manual con el parámetro
+y el valor, visual_auto al soltar uno, visual_todo_auto al soltar todos), así
+que después se puede reconstruir en qué momento intervino el profesor y
+separar lo que el estudiante vio solo de lo que alguien provocó.
+
+Con las pupilas en manual, el hallazgo escrito en el panel del facilitador se
+recalcula a partir de los milímetros reales (puntiformes / mióticas /
+normales / midriáticas) y se marca "(manual)", para que el panel no diga una
+cosa y la pantalla muestre otra.
+
+
+VER EL MODELO A PANTALLA COMPLETA
+----------------------------------
+En el panel del facilitador hay una casilla: "Ocultar signos vitales y ECG
+(imagen a pantalla completa)". Al prenderla, la columna derecha del televisor
+desaparece y la imagen del paciente pasa de 820 a 1500 px de ancho. Sirve para
+cuando quieran que el grupo mire el signo físico y nada más, o para enseñarle
+el modelo a alguien de lejos.
+
+Desde el computador del televisor también se puede con la tecla V, sin tener
+que ir al panel. Es la misma casilla: lo que se prenda en un lado se ve en el
+otro, y queda en el registro de la sesión.
+
+Ojo con usarla durante una prueba de usuario: esconder los vitales cambia lo
+que el estudiante tiene para razonar, así que si la usan con un grupo hay que
+anotarlo, porque ese grupo deja de ser comparable con los demás.
+
+
+LOS HALLAZGOS TAMPOCO SE ESCRIBEN EN EL TELEVISOR
+--------------------------------------------------
+La vista ampliada de un sistema ya NO lista los hallazgos ("Pupilas:
+puntiformes", "Labios: cianosis marcada", "Piel facial: pálida y fría"). Poner
+el nombre del signo en pantalla es regalarle el diagnóstico al grupo: el
+estudiante tiene que verlo en la imagen, no leerlo.
+
+Lo que queda en el televisor son los signos vitales, el ECG y la imagen del
+sistema, que es lo que de verdad hay que interpretar. La imagen ahora ocupa
+todo el panel, así que se ve bastante más grande que antes.
+
+Los hallazgos siguen existiendo: aparecen en el panel del facilitador, en la
+tarjeta "LO QUE DEBERÍA ESTAR VIENDO EL ESTUDIANTE". Sirven para que quien
+observa sepa qué hay en pantalla y pueda anotar si el grupo lo mencionó o se
+le pasó. Esa es justamente la medición interesante.
+
+
+EL DIAGNÓSTICO NO APARECE EN PANTALLA (A PROPÓSITO)
+---------------------------------------------------
+El diseño de Figma decía "Sobredosis de Opioides" en el título. Lo cambié a
+"Caso A · Paciente en urgencias": si el televisor dice el diagnóstico, se le
+regala la respuesta al grupo. Si lo quieren mostrar (por ejemplo en una
+demo para los profes), hay una casilla en el panel del facilitador.
+
+
+REGISTRO PARA ANALIZAR LAS PRUEBAS
+----------------------------------
+Todo queda guardado con hora en la carpeta "registros" (un archivo por
+sesión): qué sistema abrieron y cuándo, cuánto tardaron desde el inicio del
+caso, pausas, cambios de intensidad y las notas que escriban en el panel del
+facilitador. "Reiniciar" empieza un archivo nuevo, así que reinicien entre
+un grupo y el siguiente. También se puede descargar desde el panel.
+
+
+GUION SUGERIDO PARA UNA PRUEBA DE USUARIO (15-20 min por grupo)
+---------------------------------------------------------------
+Antes: Reiniciar, elegir Caso A o B, dejar el QR visible en el televisor.
+  1. Pedir a un estudiante que conecte su celular sin explicarle cómo
+     (¿entiende el QR? ¿cuánto tarda?).
+  2. Iniciar el caso. Tarea: "Examinen al paciente y díganme qué le pasa".
+     No dar pistas sobre los sistemas.
+  3. Observar y anotar en el panel: ¿qué sistema abren primero? ¿miran el
+     televisor o solo el celular? ¿vuelven a la vista general? ¿alguien
+     pide el celular a quien lo tiene?
+  4. Cuando propongan una conducta, simular la mejoría (Caso A) o dejar que
+     progrese (Caso B) y observar si notan el cambio en pantalla.
+  5. Al final, 3 preguntas cortas: ¿qué fue lo más útil? ¿qué fue confuso?
+     ¿qué le quitarían o agregarían?
+Variantes para comparar entre grupos: con y sin "conteo de críticos en el
+celular" (casilla en el panel), para ver si los números guían demasiado.
+
+
+EL MODELO 3D (static/modelo.glb)
+--------------------------------
+El modelo que se usa hoy es la cabeza completa que entregó el diseñador, con
+los OJOS YA MONTADOS DENTRO DE LA CARA y los párpados abiertos. Reemplazó a la
+cabeza del repo de Juan (que tenía los ojos cerrados) y al ojo suelto que se
+mostraba aparte: ya no existen static/ojo.glb ni static/visorojos.js, todo lo
+dibuja static/visor3d.js sobre una sola escena.
+
+Cómo está armado el archivo:
+
+  - Nodos: "Head" (la cabeza, una sola malla con textura) y "Eye" / "Eye_2"
+    (los dos ojos, cada uno con su material "Iris" y su material de globo).
+    Que los ojos sean nodos aparte es lo que deja mover cada pupila por su
+    cuenta; si el diseñador los une en una sola malla, se rompe.
+  - Trae texturas de color, normales y rugosidad. La app NO las reemplaza:
+    las tiñe por encima, así que la piel conserva su detalle.
+  - No trae animaciones ni morph targets. El diseñador mencionó una
+    "animación de palidez": esa no viaja en el .glb (glTF no exporta
+    animaciones de material de Blender). No hace falta: la palidez, la
+    cianosis, el brillo de sudor y el tamaño de pupila los calcula la app a
+    partir del escenario, y además se pueden fijar a mano desde el panel.
+
+Lo que la app le pinta encima (static/visor3d.js):
+
+  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara
+    en coordenadas de mundo para que aguante la escala y la rotación del
+    nodo. El radio es 0,021 (unos 2,5 cm): queda en los labios y se desvanece
+    antes de la barbilla.
+  - PALIDEZ: tiñe toda la cara, sin tocar la textura.
+  - SUDORACIÓN: baja la rugosidad de la piel (brillo) y aparecen gotitas sobre
+    frente, sienes y mejillas. Las gotas se colocan lanzando rayos de frente
+    contra la malla; si el rayo pega en un borde muy inclinado (una oreja, el
+    contorno) se descarta, para que ninguna quede flotando fuera de la
+    silueta.
+  - PUPILAS: ver abajo.
+
+Las vistas (cara / labios / ojos) las elige el estudiante desde el celular y
+el televisor hace el zoom. Cada vista se declara como una REGIÓN (centro,
+ancho, alto y campo de visión) y la distancia de cámara se calcula con la
+proporción real del panel. Por eso el encuadre sigue siendo correcto cuando
+se esconden los signos vitales y el panel pasa de 820 a 1500 px.
+
+
+LAS PUPILAS (se dibujan, no vienen en el modelo)
+------------------------------------------------
+La pupila NO viene en el archivo, y así debe ser: la dibuja la app encima del
+iris, y su diámetro sale directo del valor en milímetros del escenario o del
+deslizador manual. Dos milímetros son dos milímetros, no una malla escalada
+a ojo.
+
+Las constantes medidas sobre este modelo están al principio de
+static/visor3d.js:
+
+  MM_POR_UNIDAD = 12     1 unidad del modelo son 12 mm (el globo mide 2
+                         unidades = 24 mm, que es un ojo adulto).
+  Z_IRIS = 0,8215        a qué altura del nodo del ojo queda el iris.
+  HUECO_R / HUECO_Y      el tamaño de la ventana que se abre en la córnea.
+
+Dos detalles del archivo que la app compensa (si el diseñador los corrige, se
+puede borrar el arreglo):
+
+  - La córnea es parte de la misma malla cerrada y tapaba el iris. La app le
+    abre una ventana con un discard en el shader, con el borde justo en el
+    limbo. Se hace con discard y no con transparencia porque así no hay
+    errores de orden de dibujo.
+  - Dentro del nodo del ojo el iris mira hacia +Y, no hacia +Z, porque el nodo
+    trae su propia rotación de 90°. La pupila se coloca y se gira de acuerdo
+    con eso. Si en una entrega futura la pupila desaparece, mirar ahí
+    primero.
+
+La pupila se mueve suavizada, como una reacción pupilar, en vez de saltar de
+un tamaño a otro.
+
+
+EL PESO DEL MODELO (importante si lo reemplazan)
+------------------------------------------------
+El .glb que entregó el diseñador pesaba 4,72 MB por las texturas en 4K, y el
+televisor tardaba entre 14 y 22 segundos en mostrar la cara. Se comprimió a
+352 KB sin tocar la malla:
+
+  gltf-transform resize original.glb paso1.glb --width 1024 --height 1024
+  gltf-transform webp paso1.glb static/modelo.glb
+
+A 1024 px no se nota la diferencia en un televisor y el modelo queda listo
+casi al instante. Además la app guarda el modelo ya interpretado en memoria,
+así que cambiar de vista o recargar el monitor no lo vuelve a procesar.
+
+OJO: NO usar "gltf-transform optimize". Esa pasada junta las mallas y deja los
+dos ojos en un solo nodo, con lo cual las pupilas dejan de moverse por
+separado. Tampoco usar Draco: el descompresor no está en static/vendor y el
+salón puede estar sin internet.
+
+Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo
+tiene otra escala u orientación hay que volver a medir y ajustar, en
+static/visor3d.js, la constante VISTAS, el punto BOCA y las constantes de los
+ojos de aquí arriba.
+
+
+QUÉ LE FALTA AL MODELO (para pedirle al diseñador)
+--------------------------------------------------
+  1. LENGUA, como malla o material propio y con la boca entreabierta. El
+     diseñador dijo que la manda con el producto final. La cianosis central se
+     valora en la lengua y la mucosa, no en los labios; tenerlas las dos deja
+     mostrar la diferencia entre central y periférica.
+  2. LABIOS separados como malla o material propio, para que la cianosis se
+     pinte exacta en vez de aproximarla por distancia a la boca.
+  3. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
+     con ilustraciones 2D.
+
+Ya resueltos: párpados abiertos y ojos integrados en la cara (entrega del
+modelo nuevo), y texturas de piel (antes el color lo ponía toda la app).
+
+
+ARCHIVOS
+--------
+  servidor.py        El servidor en Python (sin librerías externas).
+  servidor.js        El MISMO servidor en Node.js, para computadores sin
+                     Python. Los dos sirven las mismas páginas y datos.
+  escenarios.json    TODO el contenido clínico: signos vitales, hallazgos por
+                     sistema y cómo cambian. Se edita sin tocar código.
+                     Son valores de PRUEBA: hay que pasarlos por el profesor
+                     de toxicología antes de usarlos como contenido final.
+  static/            Las páginas (monitor, control, facilitador).
+  static/modelo.glb  El modelo 3D de la cabeza, con los ojos adentro (del
+                     diseñador), comprimido a 352 KB.
+  static/visor3d.js  El visor 3D: piel, cianosis, gotas de sudor, pupilas en
+                     milímetros y vuelos de cámara.
+  static/vendor/     Three.js local (para que funcione sin internet).
+  registros/         Se llena solo con cada sesión.
+  INICIAR.bat        Arranque con doble clic.
+  PUNTO_DE_ACCESO.bat  Para cuando el wifi de la universidad no deja que el
+                     celular vea al computador (ver la sección del wifi).
+  red/               El ayudante de PowerShell que usa ese .bat.
+
+
+QUÉ FALTA / SIGUIENTE
+---------------------
+  - Lengua y labios separados en el modelo (ver arriba) para que la cianosis
+    central se pueda mostrar de verdad.
+  - Modelar el resto del cuerpo para reemplazar las ilustraciones 2D de
+    tórax, abdomen y extremidades.
+  - Capa de decisión (Flujo B: confirmar naloxona, etc.) en el celular:
+    queda pendiente de que los profes decidan si va en el MVP.
+  - Validar los valores clínicos de escenarios.json con el toxicólogo.

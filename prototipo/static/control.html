@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070d17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>SimClin · Control remoto</title>
+<style>
+  :root {
+    --fondo: #070d17; --tarjeta: #0e1826; --tarjeta-2: #132033; --borde: #1c2d42; --borde-2: #27405a;
+    --texto: #e8eef6; --texto-2: #8e9fb4; --texto-3: #5d6e83;
+    --cian: #22c3e6; --ok: #22c55e; --warn: #f5a524; --crit: #f04848;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--sans); min-height: 100%; }
+  body { padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; user-select: none; -webkit-user-select: none; }
+  .top { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--cian); }
+  .sync { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); letter-spacing: .1em; }
+  .sync .p { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .sync.off { color: var(--warn); }
+  h1 { font-size: 30px; margin: 14px 0 4px; letter-spacing: -.01em; }
+  .ayuda { color: var(--texto-2); font-size: 14.5px; margin: 0 0 18px; }
+
+  .fila { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 16px; margin: 0 0 10px; border-radius: 18px; background: var(--tarjeta); border: 1px solid var(--borde); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform .12s ease, border-color .2s, background .2s; }
+  .fila:active { transform: scale(.98); }
+  .fila .ic { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: var(--tarjeta-2); display: grid; place-items: center; color: var(--texto-2); }
+  .fila .ic svg { width: 23px; height: 23px; }
+  .fila .t { flex: 1; min-width: 0; }
+  .fila .n { font-weight: 650; font-size: 16.5px; }
+  .fila .s { font-family: var(--mono); font-size: 12px; margin-top: 4px; color: var(--texto-3); }
+  .fila .s.crit { color: var(--crit); }
+  .fila .s.warn { color: var(--warn); }
+  .fila .fl { color: var(--texto-3); font-size: 20px; }
+  .fila.activa { border-color: var(--cian); background: linear-gradient(90deg, rgba(34,195,230,.14), var(--tarjeta) 70%); }
+  .fila.activa .ic { color: var(--cian); background: rgba(34,195,230,.14); }
+  .en-monitor { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--cian); border: 1px solid rgba(34,195,230,.5); border-radius: 999px; padding: 5px 8px; white-space: nowrap; }
+  .general { margin-bottom: 16px; }
+  .subvistas { display: flex; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; padding: 0 4px 0 74px; }
+  .sub { font: inherit; font-size: 13.5px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto-2); cursor: pointer; }
+  .sub:active { transform: scale(.97); }
+  .sub.activa { border-color: var(--cian); color: var(--cian); background: rgba(34,195,230,.12); font-weight: 650; }
+  .separador { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--texto-3); margin: 4px 2px 10px; }
+
+  .aviso { margin-top: 30vh; text-align: center; padding: 0 10px; }
+  .aviso h2 { font-size: 22px; margin: 0 0 10px; }
+  .aviso p { color: var(--texto-2); font-size: 15px; line-height: 1.5; margin: 0 0 22px; }
+  .boton { display: inline-block; padding: 15px 22px; border-radius: 14px; border: 1px solid var(--cian); background: rgba(34,195,230,.12); color: var(--cian); font: inherit; font-weight: 650; font-size: 16px; cursor: pointer; }
+  .oculto { display: none !important; }
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translateX(-50%); background: #1b2a3e; border: 1px solid var(--borde-2); padding: 11px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  .toast.si { opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <span>CONTROL REMOTO</span>
+    <span class="sync off" id="sync"><span class="p"></span><span id="syncTxt">CONECTANDO</span></span>
+  </div>
+
+  <!-- Estado: otro celular tiene el control -->
+  <div class="aviso oculto" id="ocupado">
+    <h2>Otro celular tiene el control</h2>
+    <p>Solo un celular por grupo maneja el monitor, para que no se crucen las órdenes.</p>
+    <button class="boton" id="btnTomar">Tomar el control desde aquí</button>
+  </div>
+
+  <!-- Estado: el caso todavía no inicia -->
+  <div class="aviso oculto" id="espera">
+    <h2>Listo, estás conectado</h2>
+    <p>Cuando empiece el caso vas a ver aquí los sistemas del paciente. Al tocar uno, se amplía en el televisor.</p>
+  </div>
+
+  <!-- Estado: control activo -->
+  <div class="oculto" id="panel">
+    <h1>Sistemas</h1>
+    <p class="ayuda">Toca para ampliar en el monitor</p>
+    <button class="fila general" id="btnGeneral">
+      <span class="ic" id="icGeneral"></span>
+      <span class="t"><div class="n">Vista general</div><div class="s">Paciente completo y signos vitales</div></span>
+      <span class="fl">›</span>
+    </button>
+    <div class="separador">POR SISTEMA</div>
+    <div id="lista"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script src="/static/comun.js"></script>
+<script>
+const { conectar, enviar, idDispositivo, ICONOS, escapar } = SimClin;
+const $ = (id) => document.getElementById(id);
+const cid = idDispositivo();
+let soyControl = false;
+let ultimo = null;
+let pendiente;          // selección optimista mientras llega la confirmación (undefined = nada pendiente)
+
+$("icGeneral").innerHTML = ICONOS.general;
+
+function aviso(txt) {
+  const t = $("toast");
+  t.textContent = txt;
+  t.classList.add("si");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("si"), 1800);
+}
+
+async function tomar(forzar) {
+  try {
+    const r = await enviar("/api/control/tomar", { cid, forzar: !!forzar });
+    soyControl = !!r.controlador;
+  } catch (e) { soyControl = false; }
+  if (ultimo) render(ultimo);
+}
+
+async function seleccionar(sistema, subvista) {
+  if (navigator.vibrate) navigator.vibrate(12);
+  pendiente = sistema;
+  if (ultimo) render(ultimo);
+  const r = await enviar("/api/control/seleccionar", { cid, sistema, subvista }).catch(() => null);
+  if (!r || r.error) {
+    pendiente = undefined;
+    aviso(r && r.error ? "Otro celular tomó el control" : "Sin conexión con el monitor");
+    await tomar(false);
+  }
+}
+
+$("btnTomar").onclick = () => tomar(true);
+$("btnGeneral").onclick = () => seleccionar(null);
+
+function subtitulo(s, mostrarConteos) {
+  if (!mostrarConteos) return { txt: `${s.hallazgos.length} parámetros`, cls: "" };
+  if (s.criticos) return { txt: `${s.criticos} crítico${s.criticos > 1 ? "s" : ""}`, cls: "crit" };
+  if (s.alertas) return { txt: `${s.alertas} en alerta`, cls: "warn" };
+  return { txt: `${s.hallazgos.length} parámetros`, cls: "" };
+}
+
+function render(e) {
+  ultimo = e;
+  // si el servidor dice que el controlador es otro (o nadie), ajustar
+  if (e.controlador && e.controlador !== cid) soyControl = false;
+  if (!e.controlador && !soyControl) { tomar(false); }
+  if (e.controlador === cid) soyControl = true;
+
+  const ocupado = !!e.controlador && e.controlador !== cid;
+  $("ocupado").classList.toggle("oculto", !ocupado);
+  $("espera").classList.toggle("oculto", ocupado || (soyControl && e.iniciado));
+  $("panel").classList.toggle("oculto", !soyControl || !e.iniciado);
+  if (!soyControl || !e.iniciado) return;
+
+  const actual = pendiente !== undefined ? pendiente : e.sistema_seleccionado;
+  if (pendiente !== undefined && e.sistema_seleccionado === pendiente) pendiente = undefined;
+
+  $("btnGeneral").classList.toggle("activa", !actual);
+  // En este prototipo solo la cabeza está modelada: el resto ni siquiera se lista,
+  // para que nadie entre a un sistema que no existe. Se vuelve a prender desde el panel.
+  const visibles = e.sistemas.filter((s) => s.disponible !== false);
+  const html = visibles.map((s) => {
+    const sub = subtitulo(s, e.mostrar_conteos);
+    const activo = actual === s.id;
+    // Si solo queda un sistema, las subvistas se muestran siempre: así la cara,
+    // los labios y los ojos quedan a un toque y no a dos.
+    const chips = (activo || visibles.length === 1) && s.subvistas && s.subvistas.length
+      ? `<div class="subvistas">${s.subvistas.map((v) => `<button class="sub ${e.subvista === v.id ? "activa" : ""}" data-sis="${s.id}" data-sub="${v.id}">${escapar(v.nombre)}</button>`).join("")}</div>`
+      : "";
+    return `<button class="fila ${activo ? "activa" : ""}" data-id="${s.id}">
+      <span class="ic">${ICONOS[s.icono] || ""}</span>
+      <span class="t"><div class="n">${escapar(s.nombre)}</div><div class="s ${sub.cls}">${sub.txt}</div></span>
+      ${activo ? '<span class="en-monitor">EN MONITOR</span>' : '<span class="fl">›</span>'}
+    </button>${chips}`;
+  }).join("");
+  // Solo se redibuja si algo cambió: redibujar en cada mensaje "se come" los toques en el celular
+  if (html !== $("lista")._html) {
+    $("lista")._html = html;
+    $("lista").innerHTML = html;
+    $("lista").querySelectorAll(".fila").forEach((b) => (b.onclick = () => seleccionar(b.dataset.id)));
+    $("lista").querySelectorAll(".sub").forEach((b) => (b.onclick = () => seleccionar(b.dataset.sis, b.dataset.sub)));
+  }
+}
+
+conectar("control", cid, render, (ok) => {
+  $("sync").classList.toggle("off", !ok);
+  $("syncTxt").textContent = ok ? "SYNC" : "RECONECTANDO";
+  if (ok) tomar(false);
+});
+
+// Mantener la pantalla encendida mientras se usa (si el navegador lo permite)
+async function noDormir() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") noDormir(); });
+noDormir();
+</script>
+</body>
+</html>
