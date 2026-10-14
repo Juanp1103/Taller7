@@ -302,64 +302,118 @@ Variantes para comparar entre grupos: con y sin "conteo de críticos en el
 celular" (casilla en el panel), para ver si los números guían demasiado.
 
 
-EL MODELO 3D (repo de Juan)
----------------------------
-Se tomó el modelo y la idea del repo Taller7 de Juan (Three.js + GLTFLoader +
-la animación de cámara del botón "ojo") y se integró al prototipo. Cambios:
+EL MODELO 3D (static/modelo.glb)
+--------------------------------
+El modelo que se usa hoy es la cabeza completa que entregó el diseñador, con
+los OJOS YA MONTADOS DENTRO DE LA CARA y los párpados abiertos. Reemplazó a la
+cabeza del repo de Juan (que tenía los ojos cerrados) y al ojo suelto que se
+mostraba aparte: ya no existen static/ojo.glb ni static/visorojos.js, todo lo
+dibuja static/visor3d.js sobre una sola escena.
 
-  - Three.js ya NO se descarga de unpkg: está en static/vendor/three. Así el
-    salón puede estar sin internet y el modelo igual carga.
-  - El modelo ya no se ve gris: tiene material de piel que cambia con el
-    estado del paciente. La cianosis se pinta SOLO alrededor de la boca (con
-    un shader que usa la distancia a ese punto), porque el .glb es una sola
-    malla y no tiene los labios separados. La palidez tiñe toda la cara y la
-    sudoración vuelve la piel brillante y agrega gotas sobre frente y
-    mejillas.
-  - Las vistas (cara / labios / ojos) las elige el estudiante desde el
-    celular y el televisor hace el zoom.
+Cómo está armado el archivo:
+
+  - Nodos: "Head" (la cabeza, una sola malla con textura) y "Eye" / "Eye_2"
+    (los dos ojos, cada uno con su material "Iris" y su material de globo).
+    Que los ojos sean nodos aparte es lo que deja mover cada pupila por su
+    cuenta; si el diseñador los une en una sola malla, se rompe.
+  - Trae texturas de color, normales y rugosidad. La app NO las reemplaza:
+    las tiñe por encima, así que la piel conserva su detalle.
+  - No trae animaciones ni morph targets. El diseñador mencionó una
+    "animación de palidez": esa no viaja en el .glb (glTF no exporta
+    animaciones de material de Blender). No hace falta: la palidez, la
+    cianosis, el brillo de sudor y el tamaño de pupila los calcula la app a
+    partir del escenario, y además se pueden fijar a mano desde el panel.
+
+Lo que la app le pinta encima (static/visor3d.js):
+
+  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara
+    en coordenadas de mundo para que aguante la escala y la rotación del
+    nodo. El radio es 0,021 (unos 2,5 cm): queda en los labios y se desvanece
+    antes de la barbilla.
+  - PALIDEZ: tiñe toda la cara, sin tocar la textura.
+  - SUDORACIÓN: baja la rugosidad de la piel (brillo) y aparecen gotitas sobre
+    frente, sienes y mejillas. Las gotas se colocan lanzando rayos de frente
+    contra la malla; si el rayo pega en un borde muy inclinado (una oreja, el
+    contorno) se descarta, para que ninguna quede flotando fuera de la
+    silueta.
+  - PUPILAS: ver abajo.
+
+Las vistas (cara / labios / ojos) las elige el estudiante desde el celular y
+el televisor hace el zoom. Cada vista se declara como una REGIÓN (centro,
+ancho, alto y campo de visión) y la distancia de cámara se calcula con la
+proporción real del panel. Por eso el encuadre sigue siendo correcto cuando
+se esconden los signos vitales y el panel pasa de 820 a 1500 px.
+
+
+LAS PUPILAS (se dibujan, no vienen en el modelo)
+------------------------------------------------
+La pupila NO viene en el archivo, y así debe ser: la dibuja la app encima del
+iris, y su diámetro sale directo del valor en milímetros del escenario o del
+deslizador manual. Dos milímetros son dos milímetros, no una malla escalada
+a ojo.
+
+Las constantes medidas sobre este modelo están al principio de
+static/visor3d.js:
+
+  MM_POR_UNIDAD = 12     1 unidad del modelo son 12 mm (el globo mide 2
+                         unidades = 24 mm, que es un ojo adulto).
+  Z_IRIS = 0,8215        a qué altura del nodo del ojo queda el iris.
+  HUECO_R / HUECO_Y      el tamaño de la ventana que se abre en la córnea.
+
+Dos detalles del archivo que la app compensa (si el diseñador los corrige, se
+puede borrar el arreglo):
+
+  - La córnea es parte de la misma malla cerrada y tapaba el iris. La app le
+    abre una ventana con un discard en el shader, con el borde justo en el
+    limbo. Se hace con discard y no con transparencia porque así no hay
+    errores de orden de dibujo.
+  - Dentro del nodo del ojo el iris mira hacia +Y, no hacia +Z, porque el nodo
+    trae su propia rotación de 90°. La pupila se coloca y se gira de acuerdo
+    con eso. Si en una entrega futura la pupila desaparece, mirar ahí
+    primero.
+
+La pupila se mueve suavizada, como una reacción pupilar, en vez de saltar de
+un tamaño a otro.
+
+
+EL PESO DEL MODELO (importante si lo reemplazan)
+------------------------------------------------
+El .glb que entregó el diseñador pesaba 4,72 MB por las texturas en 4K, y el
+televisor tardaba entre 14 y 22 segundos en mostrar la cara. Se comprimió a
+352 KB sin tocar la malla:
+
+  gltf-transform resize original.glb paso1.glb --width 1024 --height 1024
+  gltf-transform webp paso1.glb static/modelo.glb
+
+A 1024 px no se nota la diferencia en un televisor y el modelo queda listo
+casi al instante. Además la app guarda el modelo ya interpretado en memoria,
+así que cambiar de vista o recargar el monitor no lo vuelve a procesar.
+
+OJO: NO usar "gltf-transform optimize". Esa pasada junta las mallas y deja los
+dos ojos en un solo nodo, con lo cual las pupilas dejan de moverse por
+separado. Tampoco usar Draco: el descompresor no está en static/vendor y el
+salón puede estar sin internet.
 
 Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo
-tiene otra escala u orientación, ajustar las posiciones de cámara en
-static/visor3d.js (constante VISTAS) y el punto BOCA.
+tiene otra escala u orientación hay que volver a medir y ajustar, en
+static/visor3d.js, la constante VISTAS, el punto BOCA y las constantes de los
+ojos de aquí arriba.
 
-LOS OJOS EN 3D (static/ojo.glb)
---------------------------------
-La vista "Ojos / pupilas" ya NO es un esquema 2D: son dos ojos en 3D.
-
-El diseñador entregó un modelo de ojo con dos materiales separados,
-"Eye" (globo y córnea) e "Iris". La pupila NO viene en el modelo, y así debe
-ser: la dibuja la app, y su diámetro sale directo del valor en milímetros del
-escenario. Dos milímetros son dos milímetros, no una malla escalada a ojo.
-El globo mide 2 unidades y se toma como 24 mm, así que 1 unidad = 12 mm.
-
-Dos defectos del archivo se compensan en static/visorojos.js y por eso no
-bloquearon nada; si el diseñador los corrige, se puede borrar ese arreglo:
-  - el material "Eye" venía con transparencia (alpha BLEND) siendo opaco. En
-    tiempo real eso causa errores de orden de dibujo y el borde se ve
-    festoneado. Debería exportarse opaco.
-  - la córnea es parte de la misma malla cerrada, así que tapa el iris. La app
-    abre una ventana en el casquete frontal con un discard en el shader, con
-    el borde justo en el limbo.
-  - las normales venían partidas en la costura de las UV y cruzaba una línea
-    horizontal el globo. La app suelda los vértices y las recalcula.
-
-Para cambiar el color del iris o el tamaño del hueco, ver las constantes del
-principio de static/visorojos.js.
 
 QUÉ LE FALTA AL MODELO (para pedirle al diseñador)
 --------------------------------------------------
-  1. PÁRPADOS ABIERTOS en la malla de la cabeza. Mientras la cabeza los tenga
-     cerrados, los ojos no se pueden meter en la cara: se muestran como un
-     acercamiento aparte. Es lo único que falta para que la vista de ojos deje
-     de ser una lámina y pase a ser el paciente.
-  2. LENGUA, como malla o material propio y con la boca entreabierta. La
-     cianosis central se valora en la lengua y la mucosa, no en los labios;
-     tenerlas las dos deja mostrar la diferencia entre central y periférica.
-  3. LABIOS separados como malla o material propio, para que la cianosis se
+  1. LENGUA, como malla o material propio y con la boca entreabierta. El
+     diseñador dijo que la manda con el producto final. La cianosis central se
+     valora en la lengua y la mucosa, no en los labios; tenerlas las dos deja
+     mostrar la diferencia entre central y periférica.
+  2. LABIOS separados como malla o material propio, para que la cianosis se
      pinte exacta en vez de aproximarla por distancia a la boca.
-  4. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
+  3. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
      con ilustraciones 2D.
-  5. Texturas: ninguno de los dos modelos trae; el color lo pone la app.
+
+Ya resueltos: párpados abiertos y ojos integrados en la cara (entrega del
+modelo nuevo), y texturas de piel (antes el color lo ponía toda la app).
+
 
 ARCHIVOS
 --------
@@ -371,10 +425,10 @@ ARCHIVOS
                      Son valores de PRUEBA: hay que pasarlos por el profesor
                      de toxicología antes de usarlos como contenido final.
   static/            Las páginas (monitor, control, facilitador).
-  static/modelo.glb  El modelo 3D de la cabeza (del repo de Juan).
-  static/ojo.glb     El modelo 3D del ojo (del diseñador).
-  static/visor3d.js  El visor 3D de la cabeza: piel, gotas y vuelos de cámara.
-  static/visorojos.js El visor 3D de los ojos y el cálculo de la pupila en mm.
+  static/modelo.glb  El modelo 3D de la cabeza, con los ojos adentro (del
+                     diseñador), comprimido a 352 KB.
+  static/visor3d.js  El visor 3D: piel, cianosis, gotas de sudor, pupilas en
+                     milímetros y vuelos de cámara.
   static/vendor/     Three.js local (para que funcione sin internet).
   registros/         Se llena solo con cada sesión.
   INICIAR.bat        Arranque con doble clic.
@@ -385,8 +439,8 @@ ARCHIVOS
 
 QUÉ FALTA / SIGUIENTE
 ---------------------
-  - Exportar el modelo con ojos y labios separados (ver arriba) para que la
-    miosis y la cianosis se vean en el 3D y no en un esquema.
+  - Lengua y labios separados en el modelo (ver arriba) para que la cianosis
+    central se pueda mostrar de verdad.
   - Modelar el resto del cuerpo para reemplazar las ilustraciones 2D de
     tórax, abdomen y extremidades.
   - Capa de decisión (Flujo B: confirmar naloxona, etc.) en el celular:
