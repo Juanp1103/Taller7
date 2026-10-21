@@ -359,6 +359,9 @@ LIMITES_VISUAL = {
     "temblor": [0.0, 1.0],
     "parpados": [0.0, 1.0],
     "marcas": [0.0, 1.0],
+    # La boca no la mueve ningún escenario (en escenarios.json va [0, 0]): se
+    # abre a mano, para mostrarle la lengua al grupo cuando el profesor quiera.
+    "boca": [0.0, 1.0],
 }
 
 

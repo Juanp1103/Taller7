@@ -203,10 +203,13 @@ siete signos físicos que el escenario calcula, cada uno con su deslizador:
   Temblor               0 a 100 %    solo extremidades (2D)
   Párpados caídos       0 a 100 %    solo cara 2D
   Marcas de venopunción 0 a 100 %    solo extremidades (2D)
+  Boca abierta          0 a 100 %    baja la mandíbula · solo cara 3D
 
-No hay nada inventado: son exactamente los parámetros que ya existían en
-escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
-fijarlos a mano.
+Los siete primeros ya existían en escenarios.json y las vistas ya los
+dibujaban; lo único nuevo fue poder fijarlos a mano. "Boca abierta" sí es
+nueva, y va aparte: ningún escenario la mueve (en escenarios.json va en cero),
+porque abrir la boca no es algo que le pase al paciente con el tóxico, sino
+algo que el profesor decide mostrar.
 
 Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
 sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
@@ -307,45 +310,48 @@ celular" (casilla en el panel), para ver si los números guían demasiado.
 
 EL MODELO 3D (static/modelo.glb)
 --------------------------------
-El modelo que se usa hoy es la cabeza completa que entregó el diseñador, con
-los OJOS YA MONTADOS DENTRO DE LA CARA y los párpados abiertos. Reemplazó a la
-cabeza del repo de Juan (que tenía los ojos cerrados) y al ojo suelto que se
-mostraba aparte: ya no existen static/ojo.glb ni static/visorojos.js, todo lo
-dibuja static/visor3d.js sobre una sola escena.
+Hoy el modelo es un BUSTO: cabeza, cuello y hombros, con textura de piel, los
+dos ojos montados en las órbitas, los párpados abiertos y la boca modelada por
+dentro (mandíbula, dentadura, faringe y lengua). Reemplazó al modelo anterior,
+que era solo una cabeza.
 
 Cómo está armado el archivo:
 
-  - Nodos: "Head" (la cabeza, una sola malla con textura) y "Eye" / "Eye_2"
-    (los dos ojos, cada uno con su material "Iris" y su material de globo).
+  - Nodos: "Eye" y "Eye001" (los dos ojos, cada uno con su material de iris),
+    "grp_blendShapes_01" (la cabeza) y "Human_-_Denture" (la boca por dentro,
+    con su propio esqueleto de 15 huesos).
     Que los ojos sean nodos aparte es lo que deja mover cada pupila por su
     cuenta; si el diseñador los une en una sola malla, se rompe.
+  - La cabeza trae un morph llamado "jawOpen" que separa los labios, y una
+    animación de 21 segundos que lo mueve. La animación NO se usa: la app fija
+    el valor cuando quiere, que es más útil que reproducir una animación.
   - Trae texturas de color, normales y rugosidad. La app NO las reemplaza:
     las tiñe por encima, así que la piel conserva su detalle.
-  - No trae animaciones ni morph targets. El diseñador mencionó una
-    "animación de palidez": esa no viaja en el .glb (glTF no exporta
-    animaciones de material de Blender). No hace falta: la palidez, la
-    cianosis, el brillo de sudor y el tamaño de pupila los calcula la app a
-    partir del escenario, y además se pueden fijar a mano desde el panel.
 
 Lo que la app le pinta encima (static/visor3d.js):
 
-  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara
-    en coordenadas de mundo para que aguante la escala y la rotación del
-    nodo. El radio es 0,021 (unos 2,5 cm): queda en los labios y se desvanece
-    antes de la barbilla.
+  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara en
+    coordenadas de mundo para que aguante la escala y la rotación del nodo.
+    Los labios son una elipse ancha y baja, así que la máscara aplasta el eje
+    X: con una esfera el morado se subía al bigote y bajaba a la barbilla.
   - PALIDEZ: tiñe toda la cara, sin tocar la textura.
   - SUDORACIÓN: baja la rugosidad de la piel (brillo) y aparecen gotitas sobre
     frente, sienes y mejillas. Las gotas se colocan lanzando rayos de frente
     contra la malla; si el rayo pega en un borde muy inclinado (una oreja, el
-    contorno) se descarta, para que ninguna quede flotando fuera de la
-    silueta.
+    contorno) se descarta, para que ninguna quede flotando fuera de la silueta.
   - PUPILAS: ver abajo.
+  - BOCA ABIERTA: ver abajo.
 
 Las vistas (cara / labios / ojos) las elige el estudiante desde el celular y
 el televisor hace el zoom. Cada vista se declara como una REGIÓN (centro,
 ancho, alto y campo de visión) y la distancia de cámara se calcula con la
 proporción real del panel. Por eso el encuadre sigue siendo correcto cuando
 se esconden los signos vitales y el panel pasa de 820 a 1500 px.
+
+Las transiciones (la pupila que se cierra, la boca que se abre) van por TIEMPO
+y no por cuadro. En un computador lento, o con tarjeta gráfica por software,
+el bucle corre a dos o tres cuadros por segundo y una interpolación por cuadro
+dejaba la pupila a medio camino para siempre.
 
 
 LAS PUPILAS (se dibujan, no vienen en el modelo)
@@ -355,67 +361,96 @@ iris, y su diámetro sale directo del valor en milímetros del escenario o del
 deslizador manual. Dos milímetros son dos milímetros, no una malla escalada
 a ojo.
 
-Las constantes medidas sobre este modelo están al principio de
-static/visor3d.js:
+El tamaño de una unidad del modelo en milímetros se saca de la escala del nodo
+del ojo, no está escrito a mano: si el diseñador reexporta a otra escala, la
+pupila sigue midiendo bien. En esta entrega da 12,93 mm por unidad.
 
-  MM_POR_UNIDAD = 12     1 unidad del modelo son 12 mm (el globo mide 2
-                         unidades = 24 mm, que es un ojo adulto).
+Las otras constantes están al principio de static/visor3d.js:
+
   Z_IRIS = 0,8215        a qué altura del nodo del ojo queda el iris.
   HUECO_R / HUECO_Y      el tamaño de la ventana que se abre en la córnea.
 
 Dos detalles del archivo que la app compensa (si el diseñador los corrige, se
 puede borrar el arreglo):
 
+  - El iris no tiene color ni textura: sin la app los ojos salen blancos. La
+    app le pone color de iris y le dibuja la pupila.
   - La córnea es parte de la misma malla cerrada y tapaba el iris. La app le
     abre una ventana con un discard en el shader, con el borde justo en el
     limbo. Se hace con discard y no con transparencia porque así no hay
     errores de orden de dibujo.
   - Dentro del nodo del ojo el iris mira hacia +Y, no hacia +Z, porque el nodo
-    trae su propia rotación de 90°. La pupila se coloca y se gira de acuerdo
-    con eso. Si en una entrega futura la pupila desaparece, mirar ahí
-    primero.
+    trae su propia rotación de 90°. Si en una entrega futura la pupila
+    desaparece, mirar ahí primero.
 
-La pupila se mueve suavizada, como una reacción pupilar, en vez de saltar de
-un tamaño a otro.
+
+LA BOCA ABIERTA (y por qué la lengua todavía no sirve)
+-------------------------------------------------------
+En el panel del facilitador, entre los signos a mano, hay un deslizador "Boca
+abierta". Abrirla son DOS cosas a la vez: el morph "jawOpen" separa los labios
+y, al mismo tiempo, la app rota el hueso de la mandíbula. Con el morph solo se
+vería una boca abierta con los dientes apretados, porque la dentadura es un
+objeto aparte que el morph no toca.
+
+La idea era mostrar CIANOSIS CENTRAL en la lengua, que es donde de verdad se
+valora y lo que pidieron los médicos de UCI. El código para teñirla ya está
+hecho y funciona. Lo que no sirve todavía es el modelo: la dentadura que
+entregó el diseñador es una pieza de prótesis dental —un arco de arriba y uno
+de abajo sobre encías gruesas— y la lengua es una placa colgada POR DEBAJO del
+arco inferior, fuera de la cavidad de la boca. Desde la cara, por mucho que se
+abra la mandíbula o se rote la lengua, solo asoma una franja.
+
+Hay que pedírselo al diseñador así: la lengua tiene que quedar DENTRO de la
+boca, apoyada en el piso, entre los dos arcos dentales, y a la escala de esta
+cabeza. Mientras tanto el deslizador sirve para mostrar la mandíbula caída —
+que en un paciente obnubilado es un hallazgo real— y la cianosis central queda
+esperando.
 
 
 EL PESO DEL MODELO (importante si lo reemplazan)
 ------------------------------------------------
-El .glb que entregó el diseñador pesaba 4,72 MB por las texturas en 4K, y el
-televisor tardaba entre 14 y 22 segundos en mostrar la cara. Se comprimió a
-352 KB sin tocar la malla:
+El .glb que entregó el diseñador pesaba 21,8 MB, de los cuales 19,2 MB eran
+texturas en 2048 sin comprimir (un solo mapa de normales pesaba 14,4 MB). Se
+comprimió a 2,8 MB sin tocar la malla:
 
   gltf-transform resize original.glb paso1.glb --width 1024 --height 1024
   gltf-transform webp paso1.glb static/modelo.glb
 
-A 1024 px no se nota la diferencia en un televisor y el modelo queda listo
-casi al instante. Además la app guarda el modelo ya interpretado en memoria,
-así que cambiar de vista o recargar el monitor no lo vuelve a procesar.
+A 1024 no se nota la diferencia en un televisor. Además la app interpreta el
+modelo UNA sola vez y lo reutiliza, así que cambiar de vista o volver a abrir
+el sistema no lo vuelve a procesar.
 
 OJO: NO usar "gltf-transform optimize". Esa pasada junta las mallas y deja los
 dos ojos en un solo nodo, con lo cual las pupilas dejan de moverse por
 separado. Tampoco usar Draco: el descompresor no está en static/vendor y el
 salón puede estar sin internet.
 
-Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo
-tiene otra escala u orientación hay que volver a medir y ajustar, en
-static/visor3d.js, la constante VISTAS, el punto BOCA y las constantes de los
-ojos de aquí arriba.
+El modelo NO se clona para cada visor: clonar una malla con esqueleto deja los
+huesos apuntando al original y la mandíbula dejaría de moverse. Como el
+televisor muestra un visor a la vez, se reutiliza el mismo modelo.
+
+Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo tiene
+otra escala u orientación hay que volver a medir y ajustar, en
+static/visor3d.js, la constante VISTAS, el punto BOCA y los puntos de las
+gotas de sudor.
 
 
 QUÉ LE FALTA AL MODELO (para pedirle al diseñador)
 --------------------------------------------------
-  1. LENGUA, como malla o material propio y con la boca entreabierta. El
-     diseñador dijo que la manda con el producto final. La cianosis central se
-     valora en la lengua y la mucosa, no en los labios; tenerlas las dos deja
-     mostrar la diferencia entre central y periférica.
-  2. LABIOS separados como malla o material propio, para que la cianosis se
-     pinte exacta en vez de aproximarla por distancia a la boca.
-  3. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
+  1. LA LENGUA DENTRO DE LA BOCA (ver arriba). Es lo único que bloquea la
+     cianosis central, que es lo que más les interesó a los médicos.
+  2. Color o textura en el iris: hoy los ojos salen blancos y el color lo pone
+     la app. Van tres entregas con lo mismo.
+  3. Que los ojos cuelguen de los grupos "grp_eye_l" y "grp_eye_r", que están
+     vacíos: hoy quedaron sueltos en la raíz de la escena, así que si algún
+     día anima la cabeza, los ojos se quedan atrás.
+  4. Exportar las texturas en 1024, para no tener que comprimirlas en cada
+     entrega.
+  5. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
      con ilustraciones 2D.
 
-Ya resueltos: párpados abiertos y ojos integrados en la cara (entrega del
-modelo nuevo), y texturas de piel (antes el color lo ponía toda la app).
+Ya resueltos: párpados abiertos, ojos integrados en la cara, texturas de piel,
+cuello y hombros, y la boca modelada por dentro.
 
 
 ARCHIVOS
@@ -428,8 +463,8 @@ ARCHIVOS
                      Son valores de PRUEBA: hay que pasarlos por el profesor
                      de toxicología antes de usarlos como contenido final.
   static/            Las páginas (monitor, control, facilitador).
-  static/modelo.glb  El modelo 3D de la cabeza, con los ojos adentro (del
-                     diseñador), comprimido a 352 KB.
+  static/modelo.glb  El modelo 3D: busto con los ojos y la boca adentro (del
+                     diseñador), comprimido a 2,8 MB.
   static/visor3d.js  El visor 3D: piel, cianosis, gotas de sudor, pupilas en
                      milímetros y vuelos de cámara.
   static/vendor/     Three.js local (para que funcione sin internet).
