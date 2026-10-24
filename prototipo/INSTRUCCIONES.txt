@@ -6,7 +6,7 @@ QUÉ ES
 El diseño de Figma Make convertido en un prototipo que funciona de verdad con
 dos dispositivos, con el modelo 3D del maniquí de Juan integrado:
 
-  - MONITOR (televisor del salón): paciente, signos vitales, ECG y el sistema
+  - MONITOR (televisor del salón): la cara del paciente y el sistema
     que el grupo esté examinando. En "Cabeza y Cuello" se muestra el MODELO
     3D (el .glb del repo de Juan) y la cámara vuela a la cara, los labios o
     los ojos según lo que toquen en el celular.
@@ -149,24 +149,42 @@ ANTES DE LA PRUEBA CON ESTUDIANTES
   institucional.
 
 
-DATOS REALES VS. MODO DEMO
---------------------------
-  - Si el lector de la carpeta "lector_monitor" está corriendo (python
-    lector.py, en el computador que muestra el monitor del simulador), el
-    prototipo lo detecta solo: el televisor muestra "DATOS REALES DEL
-    SIMULADOR", cada signo que venga de allá lleva la etiqueta REAL, y la
-    evolución del paciente (pupilas, labios, sudor, hallazgos) se calcula a
-    partir de ese dato real. El profesor controla todo desde LLEAP como
-    siempre. Ver lector_monitor/LEEME.txt.
-  - Si no hay lector, arranca en MODO DEMO (aviso amarillo, etiquetas SIM) y
-    el facilitador maneja la evolución desde su panel:
-      · "Progresión automática": el paciente empeora solo en X minutos.
-      · "Simular mejoría (naloxona)": revierte el cuadro en ~45 s.
-      · El deslizador pone la intensidad exacta.
-  - El lector lee los seis signos, pero solo los que tengan su recuadro
-    calibrado en roi_config.json. Los que no, siguen saliendo SIM. Si un
-    número queda cortado, borroso o imposible, el lector prefiere no leerlo:
-    ese campo vuelve a SIM en vez de mostrar algo falso.
+CÓMO SE MANEJA EL PACIENTE (YA NO HAY CASOS)
+---------------------------------------------
+Se quitaron los casos y la curva de intensidad. El panel del profesor es ahora
+una MESA DE CONTROL de la cara: él arma el toxidrome que va a trabajar, de un
+botón o moviendo cada signo, y lo que pone es lo que se ve en el televisor.
+
+  - Los seis botones de TOXIDROME dejan los cuatro signos puestos de un toque.
+    Salen de la tabla que dieron los médicos de UCI y están en contenido.json.
+  - Debajo, cada signo tiene su deslizador. Mover uno suelta el botón: ya no es
+    el preajuste tal cual, es lo que el profesor decidió.
+  - "LO QUE SE VE EN EL TELEVISOR" se calcula de esos mismos signos, así que el
+    panel y la pantalla nunca pueden decir cosas distintas.
+
+De las seis columnas de la tabla (FC y TA, respiración, temperatura, pupilas,
+ruidos intestinales, diaforesis), la CARA puede mostrar TRES: pupilas,
+temperatura (como color de piel, fría y pálida o caliente y rubicunda) y
+diaforesis. Las otras tres no son signos de la cara. El panel las escribe en
+"EN LA CARA NO SE PUEDE VER" para que el profesor las mencione de viva voz si
+quiere, en vez de hacer como si no existieran.
+
+Hay un cuarto control, CIANOSIS, que no está en la tabla. Se dejó porque es la
+cara visible de la depresión respiratoria, que sí está en la tabla (columna
+Resp.) y que de otro modo no se podría mostrar. Si el toxicólogo prefiere que
+no aparezca, se pone en cero en cada toxidrome de contenido.json.
+
+
+NO HAY SIGNOS VITALES EN EL TELEVISOR
+--------------------------------------
+No se pudieron capturar del simulador (no conseguimos el SDK y el lector del
+monitor quedó sin calibrar), así que no se muestran. Un número simulado al lado
+de la cara estorba más de lo que ayuda, y encima invita a que el grupo razone
+con un dato que nadie midió.
+
+El lector sigue en la carpeta "lector_monitor" y el servidor lo sigue
+consultando. Si algún día contesta, los vitales vuelven solos al televisor,
+marcados como REALES. Mientras tanto, la cara ocupa la pantalla completa.
 
 
 EL CONTROL DEL ESTUDIANTE (POR QUÉ ESTÁ ASÍ)
@@ -259,69 +277,6 @@ relacionan lo que ven en la cara con el estado del paciente, y si los tres
 acercamientos les sirven o les estorban.
 
 
-SIGNOS FÍSICOS A MANO (para el profesor)
------------------------------------------
-En el panel del facilitador, dentro de "Evolución del paciente", están los
-siete signos físicos que el escenario calcula, cada uno con su deslizador:
-
-  Pupilas               0,8 a 9 mm   ojos en 3D
-  Cianosis              0 a 100 %    labios y piel · cara 3D y 2D
-  Palidez               0 a 100 %    piel · cara 3D y 2D
-  Sudoración            0 a 100 %    gotas y brillo · cara 3D, mano 2D
-  Temblor               0 a 100 %    solo extremidades (2D)
-  Párpados caídos       0 a 100 %    solo cara 2D
-  Marcas de venopunción 0 a 100 %    solo extremidades (2D)
-
-No hay nada inventado: son exactamente los parámetros que ya existían en
-escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
-fijarlos a mano. Abrir la boca NO está acá: es una maniobra del estudiante, no
-un signo que el profesor mueva (ver la sección del control).
-
-Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
-sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
-automático. El botón "auto" de cada fila suelta ese solo; "Todo en
-automático" los suelta todos; reiniciar también, así que cada grupo arranca
-igual sin que nadie se acuerde de bajarlos.
-
-La columna de la derecha dice dónde se nota cada uno, y conviene leerla: hoy
-el celular solo deja entrar a la cabeza y la cabeza se dibuja con el modelo
-3D, así que TEMBLOR y MARCAS (que viven en la mano) y PÁRPADOS CAÍDOS (que
-vive en la cara 2D) no se van a ver a menos que apaguen la casilla "Solo los
-sistemas que ya tienen modelo 3D". Se dejaron igual para que estén listos
-cuando el resto del cuerpo exista.
-
-Sirven también con el lector conectado. De hecho ahí es donde más sirven,
-porque el monitor real no reporta nada de esto y los demás controles quedan
-desactivados: son los únicos signos que el profesor puede mover en vivo.
-
-Cada cambio queda en el registro de la sesión (visual_manual con el parámetro
-y el valor, visual_auto al soltar uno, visual_todo_auto al soltar todos), así
-que después se puede reconstruir en qué momento intervino el profesor y
-separar lo que el estudiante vio solo de lo que alguien provocó.
-
-Con las pupilas en manual, el hallazgo escrito en el panel del facilitador se
-recalcula a partir de los milímetros reales (puntiformes / mióticas /
-normales / midriáticas) y se marca "(manual)", para que el panel no diga una
-cosa y la pantalla muestre otra.
-
-
-VER EL MODELO A PANTALLA COMPLETA
-----------------------------------
-En el panel del facilitador hay una casilla: "Ocultar signos vitales y ECG
-(imagen a pantalla completa)". Al prenderla, la columna derecha del televisor
-desaparece y la imagen del paciente pasa de 820 a 1500 px de ancho. Sirve para
-cuando quieran que el grupo mire el signo físico y nada más, o para enseñarle
-el modelo a alguien de lejos.
-
-Desde el computador del televisor también se puede con la tecla V, sin tener
-que ir al panel. Es la misma casilla: lo que se prenda en un lado se ve en el
-otro, y queda en el registro de la sesión.
-
-Ojo con usarla durante una prueba de usuario: esconder los vitales cambia lo
-que el estudiante tiene para razonar, así que si la usan con un grupo hay que
-anotarlo, porque ese grupo deja de ser comparable con los demás.
-
-
 LOS HALLAZGOS TAMPOCO SE ESCRIBEN EN EL TELEVISOR
 --------------------------------------------------
 La vista ampliada de un sistema ya NO lista los hallazgos ("Pupilas:
@@ -339,26 +294,19 @@ observa sepa qué hay en pantalla y pueda anotar si el grupo lo mencionó o se
 le pasó. Esa es justamente la medición interesante.
 
 
-EL DIAGNÓSTICO NO APARECE EN PANTALLA (A PROPÓSITO)
----------------------------------------------------
-El diseño de Figma decía "Sobredosis de Opioides" en el título. Lo cambié a
-"Caso A · Paciente en urgencias": si el televisor dice el diagnóstico, se le
-regala la respuesta al grupo. Si lo quieren mostrar (por ejemplo en una
-demo para los profes), hay una casilla en el panel del facilitador.
-
-
 REGISTRO PARA ANALIZAR LAS PRUEBAS
 ----------------------------------
 Todo queda guardado con hora en la carpeta "registros" (un archivo por
 sesión): qué sistema abrieron y cuándo, cuánto tardaron desde el inicio del
-caso, pausas, cambios de intensidad y las notas que escriban en el panel del
+sesión, pausas, toxidromes, cada signo que el profesor mueva, cada
+acercamiento y cada maniobra del
 facilitador. "Reiniciar" empieza un archivo nuevo, así que reinicien entre
 un grupo y el siguiente. También se puede descargar desde el panel.
 
 
 GUION SUGERIDO PARA UNA PRUEBA DE USUARIO (15-20 min por grupo)
 ---------------------------------------------------------------
-Antes: Reiniciar, elegir Caso A o B, dejar el QR visible en el televisor.
+Antes: Reiniciar, elegir el toxidrome, dejar el QR visible en el televisor.
   1. Pedir a un estudiante que conecte su celular sin explicarle cómo
      (¿entiende el QR? ¿cuánto tarda?).
   2. Iniciar el caso. Tarea: "Examinen al paciente y díganme qué le pasa".
@@ -367,8 +315,8 @@ Antes: Reiniciar, elegir Caso A o B, dejar el QR visible en el televisor.
      acercamientos? ¿miran el televisor o solo el aparato? ¿se les ocurre
      abrirle la boca, y en qué momento? ¿alguien le pide el control a quien
      lo tiene?
-  4. Cuando propongan una conducta, simular la mejoría (Caso A) o dejar que
-     progrese (Caso B) y observar si notan el cambio en pantalla.
+  4. Cuando propongan una conducta, cambiar el toxidrome o mover un signo y
+     observar si notan el cambio en la pantalla.
   5. Al final, 3 preguntas cortas: ¿qué fue lo más útil? ¿qué fue confuso?
      ¿qué le quitarían o agregarían?
 Variantes para comparar entre grupos: con y sin "conteo de críticos en el
@@ -525,10 +473,12 @@ ARCHIVOS
   servidor.py        El servidor en Python (sin librerías externas).
   servidor.js        El MISMO servidor en Node.js, para computadores sin
                      Python. Los dos sirven las mismas páginas y datos.
-  escenarios.json    TODO el contenido clínico: signos vitales, hallazgos por
-                     sistema y cómo cambian. Se edita sin tocar código.
-                     Son valores de PRUEBA: hay que pasarlos por el profesor
-                     de toxicología antes de usarlos como contenido final.
+  contenido.json     TODO el contenido: los cuatro signos que la cara sabe
+                     mostrar, los seis toxidromes con sus valores, y qué pide
+                     la tabla que la cara no puede dar. Se edita sin tocar
+                     código. Los valores salen de la tabla de los médicos de
+                     UCI pero siguen PENDIENTES de que el toxicólogo los
+                     confirme uno por uno.
   static/            Las páginas (monitor, control, facilitador).
   static/modelo.glb  El modelo 3D: busto con los ojos y la boca adentro (del
                      diseñador), comprimido a 2,8 MB.
@@ -555,6 +505,6 @@ QUÉ FALTA / SIGUIENTE
     central se pueda mostrar de verdad.
   - Modelar el resto del cuerpo para reemplazar las ilustraciones 2D de
     tórax, abdomen y extremidades.
-  - Capa de decisión (Flujo B: confirmar naloxona, etc.) en el celular:
-    queda pendiente de que los profes decidan si va en el MVP.
-  - Validar los valores clínicos de escenarios.json con el toxicólogo.
+  - Que el profesor pueda guardar un toxidrome armado por él, además de los
+    seis que vienen.
+  - Validar los valores de contenido.json con el toxicólogo, uno por uno.

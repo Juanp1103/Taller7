@@ -58,20 +58,16 @@ LECTOR_VIGENCIA_S = 5.0        # si el lector no actualiza en este tiempo, se co
 CONTROL_INACTIVO_S = 12.0      # si el celular que tiene el control deja de responder, se libera
 TICK_S = 0.5
 
-with open(AQUI / "escenarios.json", encoding="utf-8") as f:
+with open(AQUI / "contenido.json", encoding="utf-8") as f:
     DATOS = json.load(f)
 
-
-def lerp(a, b, t):
-    return a + (b - a) * t
-
-
-def clamp(x, lo=0.0, hi=1.0):
-    return max(lo, min(hi, x))
+SIGNOS = DATOS["signos"]            # los signos que la cara sabe mostrar
+TOXIDROMES = {t["id"]: t for t in DATOS["toxidromes"]}
 
 
 def severidad_vital(clave, valor):
-    """Compara contra los rangos del JSON. Para TA se usa la sistólica."""
+    """Compara contra los rangos del JSON. Para TA se usa la sistólica.
+    Solo se usa con valores REALES del lector del simulador."""
     d = DATOS["signos_vitales"][clave]
     v = valor[0] if isinstance(valor, (list, tuple)) else valor
     lo_c, hi_c = d["crit"]
@@ -91,12 +87,20 @@ def formatear_vital(clave, valor):
     return f"{valor:.{dec}f}" if dec else f"{round(valor)}"
 
 
-def etapa(etapas, intensidad):
-    actual = etapas[0]
-    for e in etapas:
-        if intensidad + 1e-9 >= e[0]:
-            actual = e
-    return actual[1], actual[2]
+def escala_de(nombre, valor):
+    """Cómo se llama lo que se está viendo, según la escala del signo. Es lo
+    que lee el profesor en su panel; al estudiante no se le escribe nunca."""
+    d = SIGNOS[nombre]
+    texto, sev = d["escala"][0][1], d["escala"][0][2]
+    for umbral, t, s in d["escala"]:
+        if valor + 1e-9 >= umbral:
+            texto, sev = t, s
+    return texto, sev
+
+
+def limitar_signo(nombre, valor):
+    d = SIGNOS[nombre]
+    return max(d["min"], min(d["max"], float(valor)))
 
 
 # Las maniobras que el estudiante puede hacerle al paciente desde el control.
@@ -118,15 +122,6 @@ class Estado:
         self.lock = threading.Lock()
         self.cambio = threading.Condition(self.lock)
         self.version = 0
-        self.escenario = "heroina"
-        self.mostrar_dx = False
-        self.mostrar_conteos = True
-        # Esconde los signos vitales y el ECG para que la imagen del paciente
-        # use todo el ancho del televisor.
-        self.ocultar_vitales = False
-        # Hoy solo la cabeza tiene modelo 3D. Mientras el resto del cuerpo no esté
-        # modelado, el celular no debería dejar entrar a sistemas que no existen.
-        self.solo_modelados = True
         self.url_control = None      # cuál de las direcciones se muestra en el QR
         self.nueva_sesion_vars()
         # lector
@@ -142,15 +137,13 @@ class Estado:
         self.iniciado = False
         self.acumulado = 0.0
         self.inicio_tramo = None
-        self.intensidad = 0.0
-        self.objetivo = 0.0
-        self.velocidad = 0.0      # unidades de intensidad por segundo
-        self.rampa_s = 180.0
         self.sistema = None
         self.subvista = None
-        # Parámetros visuales que el profesor fijó a mano (nombre -> valor).
-        # Se sueltan al reiniciar: cada grupo empieza con el escenario tal cual.
-        self.visual_manual = {}
+        # Ya no hay casos ni curva de intensidad: el profesor pone los signos
+        # que quiera y arma el toxidrome que va a trabajar. Esto ES el estado
+        # clínico, no una excepción sobre un escenario.
+        self.signos = {n: d["normal"] for n, d in SIGNOS.items()}
+        self.toxidrome = None        # último botón de toxidrome usado, si alguno
         # Maniobras de exploración: las hace EL ESTUDIANTE desde el control, no
         # el profesor. Son acciones sobre el paciente (abrirle la boca, sacarle
         # la lengua), no ayudas: no dicen nada, solo dejan ver.
@@ -180,107 +173,64 @@ class Estado:
     def lector_vigente(self):
         return (time.time() - self.lector_ts) < LECTOR_VIGENCIA_S and bool(self.lector_valores)
 
-    def avanzar(self, dt):
-        esc = DATOS["escenarios"][self.escenario]
-        real = self.lector_vigente()
-        fuente = esc.get("intensidad_desde_dato_real")
-        if real and fuente and self.lector_valores.get(fuente["signo"]) is not None:
-            v = self.lector_valores[fuente["signo"]]
-            self.intensidad = clamp((v - fuente["estable"]) / (fuente["maximo"] - fuente["estable"]))
-            self.objetivo = self.intensidad
-        elif self.corriendo and self.velocidad > 0:
-            paso = self.velocidad * dt
-            if abs(self.objetivo - self.intensidad) <= paso:
-                self.intensidad = self.objetivo
-            else:
-                self.intensidad += paso if self.objetivo > self.intensidad else -paso
-
     def calcular(self):
-        esc = DATOS["escenarios"][self.escenario]
-        k = self.intensidad
         real = self.lector_vigente()
 
+        # Vitales: SOLO si el lector del simulador está mandando datos reales.
+        # Sin lector no se muestran. Un número simulado al lado de la cara
+        # estorba más de lo que ayuda, y además se presta para que el grupo
+        # razone con un dato que nadie midió.
         vitales = {}
-        for clave, (a, b) in esc["vitales"].items():
-            if clave == "ta":
-                valor = [lerp(a[0], b[0], k), lerp(a[1], b[1], k)]
-            else:
-                valor = lerp(a, b, k)
-            origen = "demo"
-            if real and self.lector_valores.get(clave) is not None:
-                valor = self.lector_valores[clave]
-                origen = "real"
-            d = DATOS["signos_vitales"][clave]
-            vitales[clave] = {"nombre": d["nombre"], "unidad": d["unidad"],
-                              "valor": valor, "texto": formatear_vital(clave, valor),
-                              "severidad": severidad_vital(clave, valor), "origen": origen}
+        if real:
+            for clave, valor in self.lector_valores.items():
+                d = DATOS["signos_vitales"].get(clave)
+                if d is None or valor is None:
+                    continue
+                vitales[clave] = {"nombre": d["nombre"], "unidad": d["unidad"],
+                                  "valor": valor, "texto": formatear_vital(clave, valor),
+                                  "severidad": severidad_vital(clave, valor), "origen": "real"}
 
-        visual = {n: round(lerp(a, b, k), 3) for n, (a, b) in esc["visual"].items()}
-        # El profesor puede fijar cualquiera de estos signos a mano y mandar
-        # sobre el escenario, como lo haría desde el software del simulador.
-        for nombre, v in self.visual_manual.items():
-            if nombre in visual:
-                visual[nombre] = round(v, 3)
+        visual = {n: round(v, 3) for n, v in self.signos.items()}
 
-        sistemas = []
-        total_crit = total_warn = 0
-        for s in DATOS["sistemas"]:
-            items = []
-            for h in esc["hallazgos"][s["id"]]:
-                if "signo" in h:
-                    v = vitales[h["signo"]]
-                    items.append({"nombre": h["nombre"], "texto": f"{v['texto']} {v['unidad']}",
-                                  "severidad": v["severidad"], "origen": v["origen"], "signo": h["signo"]})
-                else:
-                    texto, sev = etapa(h["etapas"], k)
-                    items.append({"nombre": h["nombre"], "texto": texto, "severidad": sev})
-            crit = sum(1 for i in items if i["severidad"] == "crit")
-            warn = sum(1 for i in items if i["severidad"] == "warn")
-            total_crit += crit
-            total_warn += warn
-            # Con la pupila en manual, el hallazgo escrito tiene que decir lo
-            # mismo que se ve, o el panel del facilitador miente.
-            if "pupila_mm" in self.visual_manual:
-                for i in items:
-                    if i["nombre"].lower().startswith("pupila"):
-                        i["texto"] = texto_pupila(visual["pupila_mm"])
-                        i["severidad"] = severidad_pupila(visual["pupila_mm"])
-            disponible = (not self.solo_modelados) or bool(s.get("modelo3d"))
-            sistemas.append({**s, "hallazgos": items, "criticos": crit, "alertas": warn,
-                             "disponible": disponible})
+        # Los hallazgos salen de los signos que puso el profesor, no de una
+        # curva: lo que dice el panel y lo que se ve en el televisor no pueden
+        # separarse nunca.
+        items = []
+        for nombre, d in SIGNOS.items():
+            texto, sev = escala_de(nombre, self.signos[nombre])
+            items.append({"nombre": d["nombre"], "texto": texto, "severidad": sev,
+                          "signo": nombre, "donde": d.get("donde", "")})
+        crit = sum(1 for i in items if i["severidad"] == "crit")
+        warn = sum(1 for i in items if i["severidad"] == "warn")
+        sistemas = [{**s, "hallazgos": items if s.get("modelo3d") else [],
+                     "criticos": crit, "alertas": warn, "disponible": bool(s.get("modelo3d"))}
+                    for s in DATOS["sistemas"]]
 
         if not self.iniciado:
             estado_paciente = "EN ESPERA"
-        elif total_crit >= 3:
+        elif crit >= 2:
             estado_paciente = "CRÍTICO"
-        elif total_crit or total_warn >= 3:
+        elif crit or warn >= 2:
             estado_paciente = "ALERTA"
         else:
-            estado_paciente = "ESTABLE"
+            estado_paciente = "SIN HALLAZGOS"
 
         ahora = time.time()
         control_activo = bool(self.controlador and ahora - self.visto.get(self.controlador, 0) < CONTROL_INACTIVO_S)
 
         self.snapshot = {
             "version": self.version,
-            "escenario": self.escenario,
-            "codigo": esc["codigo"],
-            "diagnostico": esc["diagnostico"] if self.mostrar_dx else None,
-            "paciente": esc["paciente"],
-            "motivo": esc["motivo"],
-            "mostrar_dx": self.mostrar_dx,
-            "mostrar_conteos": self.mostrar_conteos,
-            "ocultar_vitales": self.ocultar_vitales,
-            "solo_modelados": self.solo_modelados,
-            "visual_manual": dict(self.visual_manual),
+            "signos_def": SIGNOS,
+            "toxidromes": [{"id": t["id"], "nombre": t["nombre"], "nota": t.get("nota", ""),
+                            "no_visible": t.get("no_visible", "")}
+                           for t in DATOS["toxidromes"]],
+            "toxidrome": self.toxidrome,
             "maniobras": dict(self.maniobras),
             "maniobras_disponibles": [{"id": n, "nombre": d["nombre"], "exige": d["exige"]}
                                       for n, d in MANIOBRAS.items() if d["disponible"]],
-            "visual_rango": LIMITES_VISUAL,
             "iniciado": self.iniciado,
             "corriendo": self.corriendo,
             "transcurrido_s": round(self.transcurrido(), 1),
-            "intensidad": round(k, 3),
             "estado_paciente": estado_paciente,
             "vitales": vitales,
             "visual": visual,
@@ -290,8 +240,6 @@ class Estado:
             "datos_reales": real,
             "controlador": self.controlador if control_activo else None,
             "sesion_id": self.sesion_id,
-            "escenarios_disponibles": [{"id": i, "codigo": e["codigo"], "diagnostico": e["diagnostico"]}
-                                       for i, e in DATOS["escenarios"].items()],
             "urls": {**URLS, "control": ips_urls()},
             "url_control": self.url_control or (ips_urls()[0] if ips_urls() else None),
         }
@@ -303,15 +251,13 @@ ESTADO = Estado()
 
 # ---------------- hilos de fondo ----------------
 def hilo_simulacion():
-    ultimo = time.time()
+    """Ya no hay curva que avanzar: esto solo mantiene el reloj de la sesión al
+    día en las pantallas conectadas."""
     while True:
         time.sleep(TICK_S)
-        ahora = time.time()
         with ESTADO.lock:
-            ESTADO.avanzar(ahora - ultimo)
             ESTADO.calcular()
             ESTADO.notificar()
-        ultimo = ahora
 
 
 def hilo_lector():
@@ -368,41 +314,6 @@ def ips_urls():
     """Se recalcula en cada consulta: si prenden el hotspot con el servidor ya
     arrancado, la dirección nueva aparece sola en el panel."""
     return [f"http://{ip}:{PUERTO}/control" for ip in ips_locales()]
-
-
-# Lo único que el profesor puede mover a mano son estos siete parámetros, que
-# son exactamente los que el escenario ya calcula y las vistas ya dibujan.
-LIMITES_VISUAL = {
-    "pupila_mm": [0.8, 9.0],
-    "cianosis": [0.0, 1.0],
-    "palidez": [0.0, 1.0],
-    "sudor": [0.0, 1.0],
-    "temblor": [0.0, 1.0],
-    "parpados": [0.0, 1.0],
-    "marcas": [0.0, 1.0],
-}
-
-
-def texto_pupila(mm):
-    if mm <= 2.0:
-        nombre = "Puntiformes"
-    elif mm < 3.5:
-        nombre = "Mióticas"
-    elif mm < 5.5:
-        nombre = "Normales"
-    elif mm < 7.0:
-        nombre = "Midriáticas"
-    else:
-        nombre = "Midriasis marcada"
-    return f"{nombre}, {mm:.1f} mm (manual)"
-
-
-def severidad_pupila(mm):
-    if mm <= 2.0 or mm >= 7.0:
-        return "crit"
-    if mm < 3.0 or mm >= 6.0:
-        return "warn"
-    return "ok"
 
 
 def sistema_modelado(sid):
@@ -485,6 +396,15 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/registro":
             f = ESTADO.archivo_registro
             cuerpo = f.read_bytes() if f.exists() else b""
+            # Con ?json=1 lo devuelve interpretado, para pintarlo en el panel.
+            if parse_qs(url.query).get("json"):
+                filas = []
+                for linea in cuerpo.decode("utf-8", "replace").splitlines():
+                    try:
+                        filas.append(json.loads(linea))
+                    except ValueError:
+                        pass
+                return self.responder(200, {"filas": filas})
             return self.responder(200, cuerpo, "application/x-ndjson; charset=utf-8",
                                   {"Content-Disposition": f'attachment; filename="{f.name}"'})
         if ruta == "/favicon.ico":
@@ -579,8 +499,7 @@ class Manejador(BaseHTTPRequestHandler):
             for otro, d in MANIOBRAS.items():
                 if d["exige"] == nombre:
                     ESTADO.maniobras[otro] = False
-        ESTADO.registrar("maniobra", maniobra=nombre, valor=valor,
-                         intensidad=round(ESTADO.intensidad, 2))
+        ESTADO.registrar("maniobra", maniobra=nombre, valor=valor)
         ESTADO.calcular()
         ESTADO.notificar()
         return self.responder(200, {"ok": True, "maniobras": dict(ESTADO.maniobras)})
@@ -595,7 +514,7 @@ class Manejador(BaseHTTPRequestHandler):
         por_id = {s["id"]: s for s in DATOS["sistemas"]}
         if sistema is not None and sistema not in por_id:
             return self.responder(400, {"error": "sistema desconocido"})
-        if sistema is not None and ESTADO.solo_modelados and not sistema_modelado(sistema):
+        if sistema is not None and not sistema_modelado(sistema):
             return self.responder(409, {"error": "ese sistema no está disponible en este prototipo"})
         subs = [v["id"] for v in por_id.get(sistema, {}).get("subvistas", [])] if sistema else []
         if subvista is not None and subvista not in subs:
@@ -604,11 +523,10 @@ class Manejador(BaseHTTPRequestHandler):
             ESTADO.sistema = sistema
             ESTADO.subvista = subvista or (subs[0] if subs else None)
             ESTADO.registrar("sistema_abierto" if sistema else "vista_general", sistema=sistema,
-                             subvista=ESTADO.subvista, intensidad=round(ESTADO.intensidad, 2))
+                             subvista=ESTADO.subvista)
         elif subvista and subvista != ESTADO.subvista:
             ESTADO.subvista = subvista
-            ESTADO.registrar("subvista_abierta", sistema=sistema, subvista=subvista,
-                             intensidad=round(ESTADO.intensidad, 2))
+            ESTADO.registrar("subvista_abierta", sistema=sistema, subvista=subvista)
         ESTADO.calcular()
         ESTADO.notificar()
         return self.responder(200, {"ok": True})
@@ -617,30 +535,22 @@ class Manejador(BaseHTTPRequestHandler):
         accion = c.get("accion")
         valor = c.get("valor")
         E = ESTADO
-        if accion == "escenario" and valor in DATOS["escenarios"]:
-            E.escenario = valor
-            E.nueva_sesion_vars()
-            E.registrar("escenario", escenario=valor)
-        elif accion == "iniciar":
+        if accion == "iniciar":
             if not E.iniciado:
                 E.iniciado = True
-                # El caso arranca mostrando el primer sistema que tenga modelo:
-                # con solo la cabeza hecha, una "vista general" del cuerpo no
-                # aporta nada y obligaba a un toque de más.
+                # Arranca mostrando el primer sistema modelado: con solo la
+                # cabeza hecha, una "vista general" del cuerpo no aporta nada.
                 if E.sistema is None:
-                    primero = next((s for s in DATOS["sistemas"]
-                                    if not E.solo_modelados or sistema_modelado(s["id"])), None)
+                    primero = next((s for s in DATOS["sistemas"] if s.get("modelo3d")), None)
                     if primero:
                         E.sistema = primero["id"]
                         subs = [v["id"] for v in primero.get("subvistas", [])]
                         E.subvista = subs[0] if subs else None
-                E.registrar("caso_iniciado", escenario=E.escenario, rampa_s=E.rampa_s,
-                            sistema=E.sistema, subvista=E.subvista)
+                E.registrar("sesion_iniciada", sistema=E.sistema, subvista=E.subvista,
+                            signos={n: round(v, 3) for n, v in E.signos.items()})
             if not E.corriendo:
                 E.corriendo = True
                 E.inicio_tramo = time.time()
-                E.objetivo = 1.0
-                E.velocidad = 1.0 / max(E.rampa_s, 10)
                 E.registrar("reanudado")
         elif accion == "pausar" and E.corriendo:
             E.acumulado += time.time() - E.inicio_tramo
@@ -649,60 +559,37 @@ class Manejador(BaseHTTPRequestHandler):
         elif accion == "reiniciar":
             E.registrar("reiniciado")
             E.nueva_sesion_vars()
-            E.registrar("sesion_nueva", escenario=E.escenario)
-        elif accion == "intensidad":
-            v = clamp(float(valor or 0))
-            E.intensidad = E.objetivo = v
-            E.velocidad = 0.0
-            E.registrar("intensidad_manual", valor=round(v, 2))
-        elif accion == "empeorar":
-            E.objetivo = 1.0
-            E.velocidad = 1.0 / max(E.rampa_s, 10)
-            E.registrar("progresion_automatica")
-        elif accion == "mejorar":
-            E.objetivo = 0.1
-            E.velocidad = 1.0 / 45.0
-            E.registrar("simular_mejoria")
-        elif accion == "rampa":
-            E.rampa_s = max(10.0, float(valor or 180))
-            if E.objetivo >= 1.0 and E.velocidad > 0:
-                E.velocidad = 1.0 / E.rampa_s
-        elif accion == "mostrar_dx":
-            E.mostrar_dx = bool(valor)
+            E.registrar("sesion_nueva")
+        elif accion == "signo":
+            # valor = {"nombre": "cianosis", "valor": 0.8}
+            d = valor if isinstance(valor, dict) else {}
+            nombre = d.get("nombre")
+            if nombre not in SIGNOS:
+                return self.responder(400, {"error": "signo desconocido"})
+            try:
+                E.signos[nombre] = limitar_signo(nombre, d.get("valor"))
+            except (TypeError, ValueError):
+                return self.responder(400, {"error": "valor inválido"})
+            E.toxidrome = None       # ya no es el preajuste tal cual
+            E.registrar("signo", signo=nombre, valor=round(E.signos[nombre], 3))
+        elif accion == "toxidrome":
+            t = TOXIDROMES.get(valor)
+            if t is None:
+                return self.responder(400, {"error": "toxidrome desconocido"})
+            for nombre, v in t["signos"].items():
+                if nombre in SIGNOS:
+                    E.signos[nombre] = limitar_signo(nombre, v)
+            E.toxidrome = t["id"]
+            E.registrar("toxidrome", toxidrome=t["id"],
+                        signos={n: round(v, 3) for n, v in E.signos.items()})
+        elif accion == "normales":
+            for nombre, d in SIGNOS.items():
+                E.signos[nombre] = d["normal"]
+            E.toxidrome = None
+            E.registrar("signos_normales")
         elif accion == "url_control":
             E.url_control = str(valor) if valor else None
             E.registrar("url_control", valor=E.url_control)
-        elif accion == "mostrar_conteos":
-            E.mostrar_conteos = bool(valor)
-            E.registrar("mostrar_conteos", valor=bool(valor))
-        elif accion == "visual_manual":
-            # valor = {"nombre": "cianosis", "valor": 0.8}  |  valor null = auto
-            d = valor if isinstance(valor, dict) else {}
-            nombre = d.get("nombre")
-            if nombre not in LIMITES_VISUAL:
-                return self.responder(400, {"error": "parámetro visual desconocido"})
-            v = d.get("valor")
-            if v is None or v == "":
-                E.visual_manual.pop(nombre, None)
-                E.registrar("visual_auto", parametro=nombre)
-            else:
-                lo, hi = LIMITES_VISUAL[nombre]
-                E.visual_manual[nombre] = max(lo, min(hi, float(v)))
-                E.registrar("visual_manual", parametro=nombre,
-                            valor=round(E.visual_manual[nombre], 3))
-        elif accion == "ocultar_vitales":
-            E.ocultar_vitales = bool(valor)
-            E.registrar("ocultar_vitales", valor=bool(valor))
-        elif accion == "visual_todo_auto":
-            E.visual_manual.clear()
-            E.registrar("visual_todo_auto")
-        elif accion == "solo_modelados":
-            E.solo_modelados = bool(valor)
-            # si se apaga el sistema que estaba abierto, se vuelve a la vista general
-            if E.solo_modelados and E.sistema and not sistema_modelado(E.sistema):
-                E.sistema = None
-                E.subvista = None
-            E.registrar("solo_modelados", valor=bool(valor))
         elif accion == "soltar_control":
             E.registrar("control_liberado")
             E.controlador = None

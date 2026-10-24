@@ -10,7 +10,8 @@
  *   "Human_-_Denture"       la boca por dentro, con su esqueleto de huesos
  *
  * Lo que pone la app encima del modelo:
- *   - Cianosis alrededor de la boca y palidez en toda la cara, con un shader
+ *   - Cianosis alrededor de la boca y color de piel (pálida o rubicunda) en
+ *     toda la cara, con un shader
  *     que respeta la textura y el mapa de normales de la escultura.
  *   - Cianosis CENTRAL en la lengua, que es donde se valora de verdad. Por eso
  *     la lengua se tiñe más y sin depender de la distancia a la boca.
@@ -32,6 +33,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const PALIDEZ = new THREE.Color(0xd9cec7);
+const RUBICUNDEZ = new THREE.Color(0xc9654a);
 const CIANOSIS = new THREE.Color(0x5f5a8a);
 const CIANOSIS_LENGUA = new THREE.Color(0x6b5f93);
 const COLOR_IRIS = new THREE.Color(0x6b4a2f);
@@ -99,9 +101,12 @@ const uniformes = {
   uRadio: { value: RADIO_BOCA },
   uAchatado: { value: ACHATADO_BOCA },
   uCianosis: { value: 0 },
-  uPalidez: { value: 0 },
+  // Un solo eje para el color de la piel: negativo pálido, positivo rubicundo.
+  // Son los dos extremos de lo mismo y así el profesor tiene un control, no dos.
+  uPiel: { value: 0 },
   uColorCianosis: { value: CIANOSIS.clone() },
   uColorPalidez: { value: PALIDEZ.clone() },
+  uColorRubicundez: { value: RUBICUNDEZ.clone() },
 };
 const uniformesLengua = {
   uCianosis: uniformes.uCianosis,
@@ -110,7 +115,7 @@ const uniformesLengua = {
 
 /* Tiñe la piel SIN perder la textura ni el relieve de la escultura: se
  * engancha al material que trae el modelo en vez de reemplazarlo. La
- * cianosis se concentra alrededor de la boca; la palidez cubre toda la cara.
+ * cianosis se concentra alrededor de la boca; el color de piel cubre toda la cara.
  * Se usa la posición en coordenadas de mundo, así que no importa cómo esté
  * escalado o rotado el nodo de la cabeza. */
 function pintarPiel(material) {
@@ -124,14 +129,15 @@ function pintarPiel(material) {
       .replace("#include <common>", `#include <common>
         varying vec3 vMundo;
         uniform vec3 uBoca; uniform float uRadio; uniform float uAchatado;
-        uniform float uCianosis; uniform float uPalidez;
-        uniform vec3 uColorCianosis; uniform vec3 uColorPalidez;`)
+        uniform float uCianosis; uniform float uPiel;
+        uniform vec3 uColorCianosis; uniform vec3 uColorPalidez; uniform vec3 uColorRubicundez;`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 rel = vMundo - uBoca;
         rel.x *= uAchatado;
         float d = length(rel);
         float mascara = 1.0 - smoothstep(uRadio * 0.55, uRadio * 1.15, d);
-        vec3 piel = mix(diffuseColor.rgb, uColorPalidez, uPalidez * 0.65);
+        vec3 piel = mix(diffuseColor.rgb, uColorPalidez, max(0.0, -uPiel) * 0.65);
+        piel = mix(piel, uColorRubicundez, max(0.0, uPiel) * 0.5);
         piel = mix(piel, uColorCianosis, clamp(uCianosis, 0.0, 1.0) * (0.03 + 0.82 * mascara));
         diffuseColor.rgb = piel;`);
   };
@@ -422,7 +428,7 @@ export function crearVisor(contenedor) {
   function aplicarEstado(visual, maniobras) {
     if (!visual) return;
     uniformes.uCianosis.value = visual.cianosis || 0;
-    uniformes.uPalidez.value = visual.palidez || 0;
+    uniformes.uPiel.value = visual.piel || 0;
     mmObjetivo = visual.pupila_mm || 4;
     // Las maniobras las hace el estudiante desde el control, no el escenario.
     bocaObjetivo = maniobras && maniobras.boca ? 1 : 0;

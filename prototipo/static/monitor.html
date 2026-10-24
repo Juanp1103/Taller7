@@ -141,6 +141,7 @@
     align-items: center; background: rgba(8,16,28,.96); border: 1px solid var(--borde-2);
     border-radius: 14px; padding: 10px 14px 10px 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
   .qr-esquina.oculto { display: none; }
+  .oculto { display: none !important; }
   .qr-mini { background: #fff; border-radius: 9px; padding: 6px; width: 104px; height: 104px; }
   .qr-mini svg { width: 100%; height: 100%; display: block; }
   .qr-pie { display: flex; flex-direction: column; gap: 5px; max-width: 215px; }
@@ -297,7 +298,10 @@ function mostrarVista(id) {
 /* ---------- ilustraciones por sistema ---------- */
 const PIEL = "#d6a585";
 function colorPiel(vis) {
-  let c = mezclarColor(PIEL, "#d8ccc4", vis.palidez || 0);
+  // Un solo eje: negativo pálido, positivo rubicundo, igual que en el 3D.
+  const piel = vis.piel || 0;
+  let c = mezclarColor(PIEL, "#d8ccc4", Math.max(0, -piel));
+  c = mezclarColor(c, "#c9654a", Math.max(0, piel) * 0.7);
   c = mezclarColor(c, "#a9afc6", (vis.cianosis || 0) * 0.35);
   return c;
 }
@@ -416,26 +420,26 @@ function actualizarIlustracion(id, e) {
   cont.querySelectorAll(".piel").forEach((n) => n.setAttribute("fill", piel));
   if (id === "cabeza") {
     cont.querySelectorAll(".pupila").forEach((p) => p.setAttribute("r", (vis.pupila_mm * 2.9).toFixed(1)));
-    cont.querySelectorAll(".parpado").forEach((p) => p.setAttribute("height", (vis.parpados * 44).toFixed(1)));
+    cont.querySelectorAll(".parpado").forEach((p) => p.setAttribute("height", ((vis.parpados || 0) * 44).toFixed(1)));
     $("labios").setAttribute("fill", colorLabios(vis));
     $("sudor").setAttribute("opacity", vis.sudor);
     $("cuello").setAttribute("fill", piel);
-  } else if (id === "torax") {
+  } else if (id === "torax" && e.vitales.fr && e.vitales.spo2) {
     const fr = e.vitales.fr.valor, sat = e.vitales.spo2.valor;
     const t = Math.max(0, Math.min(1, (97 - sat) / 17));
     const c = mezclarColor("#e57a7a", "#8a8fb8", t);
     $("pulmonI").setAttribute("fill", c); $("pulmonD").setAttribute("fill", c);
     ponerDuracion($("pulmones"), "resp", 60 / Math.max(fr, 2));
     $("txtResp").textContent = `${e.vitales.fr.texto} RESPIRACIONES POR MINUTO`;
-  } else if (id === "cardio") {
+  } else if (id === "cardio" && e.vitales.fc) {
     const fc = e.vitales.fc.valor;
     ponerDuracion($("corazon"), "fc", 60 / Math.max(fc, 20));
     $("txtLatido").textContent = `${e.vitales.fc.texto} LATIDOS POR MINUTO`;
   } else if (id === "extremidades") {
     cont.querySelectorAll(".una").forEach((u) => u.setAttribute("fill", colorUnas(vis)));
-    $("marcas").setAttribute("opacity", vis.marcas);
+    $("marcas").setAttribute("opacity", vis.marcas || 0);
     $("sudorMano").setAttribute("opacity", vis.sudor);
-    $("mano").style.setProperty("--amp", (vis.temblor * 3.2).toFixed(2) + "px");
+    $("mano").style.setProperty("--amp", ((vis.temblor || 0) * 3.2).toFixed(2) + "px");
   } else if (id === "neuro") {
     const s = e.sistemas.find((x) => x.id === "neuro");
     const g = s.hallazgos.find((h) => h.nombre === "Glasgow");
@@ -449,30 +453,34 @@ function actualizarIlustracion(id, e) {
 /* ---------- render principal ---------- */
 function render(e) {
   estado = e;
-  // Modo "solo imagen": lo prende el facilitador, o la tecla V en este mismo
-  // computador. Los visores se reajustan solos (tienen ResizeObserver).
-  $("escenario").classList.toggle("sin-vitales", !!e.ocultar_vitales);
-  $("titulo").textContent = e.diagnostico ? e.diagnostico : `${e.codigo} · Paciente en urgencias`;
-  $("subtitulo").textContent = `Paciente · ${e.paciente} · ${e.motivo}`;
+  // Los signos vitales solo se muestran si vienen del monitor REAL del
+  // simulador. Sin lector no hay columna: un número simulado al lado de la
+  // cara estorba, y encima invita a razonar con un dato que nadie midió.
+  // Los visores se reajustan solos (tienen ResizeObserver).
+  const hayVitales = !!e.datos_reales && Object.keys(e.vitales || {}).length > 0;
+  $("escenario").classList.toggle("sin-vitales", !hayVitales);
+  $("titulo").textContent = "Paciente en urgencias";
+  $("subtitulo").textContent = "Observen al paciente y digan qué le pasa";
   $("tiempo").textContent = "T+ " + reloj(e.transcurrido_s);
 
   const est = $("estado");
-  const clase = { "CRÍTICO": "crit", "ALERTA": "warn", "ESTABLE": "ok" }[e.estado_paciente] || "espera";
+  const clase = { "CRÍTICO": "crit", "ALERTA": "warn", "SIN HALLAZGOS": "ok" }[e.estado_paciente] || "espera";
   est.className = "estado " + clase;
   $("estadoTxt").textContent = e.estado_paciente;
 
-  const f = $("fuente");
-  f.className = "chip " + (e.datos_reales ? "real" : "demo");
-  $("fuenteTxt").textContent = e.datos_reales ? "DATOS REALES DEL SIMULADOR" : "MODO DEMO · VALORES SIMULADOS";
+  // El distintivo de la fuente solo tiene sentido si hay vitales que calificar.
+  $("fuente").className = "chip real" + (hayVitales ? "" : " oculto");
+  $("fuenteTxt").textContent = "DATOS REALES DEL SIMULADOR";
 
   const ctl = $("ctl");
   ctl.classList.toggle("on", !!e.controlador);
   ctl.textContent = e.controlador ? "● CONTROL REMOTO CONECTADO" : "CONTROL REMOTO: SIN CELULAR CONECTADO";
 
-  // vitales
+  // vitales (solo existen con el lector del simulador conectado)
   const sel = e.sistema_seleccionado;
-  for (const k of ORDEN_VITALES) {
+  for (const k of (hayVitales ? ORDEN_VITALES : [])) {
     const v = e.vitales[k];
+    if (!v) continue;
     const card = $("v_" + k);
     const activo = e.iniciado;
     card.className = "vital " + (activo ? v.severidad : "") +
@@ -500,10 +508,7 @@ function render(e) {
   if (!e.iniciado) {
     mostrarVista("vistaEspera");
     const url = urlCtl;
-    // El texto cambia según lo que de verdad se pueda abrir hoy
-    $("esperaDetalle").textContent = e.solo_modelados === false
-      ? "Desde el celular podrán ampliar en esta pantalla cada sistema del paciente."
-      : "Desde el celular podrán acercarse a la cara del paciente en esta pantalla: cara completa, labios y ojos.";
+    $("esperaDetalle").textContent = "Desde el celular o la tablet podrán acercarse a la cara del paciente en esta pantalla, y explorarlo.";
     if ($("urlControl").textContent !== url) {
       $("urlControl").textContent = url;
       $("qr").innerHTML = qrSVG(url, 300);
@@ -575,7 +580,7 @@ function renderPines(e) {
   function paso(ahora) {
     const dt = Math.min(0.05, (ahora - last) / 1000); last = ahora;
     const activo = estado && estado.iniciado;
-    const fc = activo ? Math.max(20, estado.vitales.fc.valor) : 0;
+    const fc = (activo && estado.vitales && estado.vitales.fc) ? Math.max(20, estado.vitales.fc.valor) : 0;
     const periodo = fc ? 60 / fc : 1e9;
     const vel = W / 5.2; // la pantalla muestra ~5 s de trazo
     const pasos = 4;
@@ -654,14 +659,6 @@ function actualizarVisor3D(e) {
 }
 
 // Atajo para quien esté en el computador del televisor: V esconde o muestra
-// los signos vitales sin tener que ir al panel del facilitador.
-addEventListener("keydown", (ev) => {
-  if (ev.key !== "v" && ev.key !== "V") return;
-  fetch("/api/facilitador", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accion: "ocultar_vitales", valor: !(estado && estado.ocultar_vitales) }),
-  });
-});
 
 conectar("monitor", null, render, (ok) => $("desconectado").classList.toggle("si", !ok));
 </script>
