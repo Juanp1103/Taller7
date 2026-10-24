@@ -99,6 +99,20 @@ def etapa(etapas, intensidad):
     return actual[1], actual[2]
 
 
+# Las maniobras que el estudiante puede hacerle al paciente desde el control.
+# "exige" es la maniobra que tiene que estar hecha primero: no se puede sacar
+# la lengua con la boca cerrada.
+MANIOBRAS = {
+    "boca":   {"nombre": "Abrir la boca", "exige": None, "disponible": True},
+    # La lengua está lista en el servidor y en el control, pero apagada: el
+    # modelo que entregó el diseñador tiene la lengua colgada por debajo del
+    # arco dental y con el rig compartido, así que no se puede sacar sin
+    # romper la boca (ver el comentario en static/visor3d.js). El día que
+    # llegue bien, se pone disponible en True y queda andando.
+    "lengua": {"nombre": "Sacar la lengua", "exige": "boca", "disponible": False},
+}
+
+
 class Estado:
     def __init__(self):
         self.lock = threading.Lock()
@@ -137,6 +151,10 @@ class Estado:
         # Parámetros visuales que el profesor fijó a mano (nombre -> valor).
         # Se sueltan al reiniciar: cada grupo empieza con el escenario tal cual.
         self.visual_manual = {}
+        # Maniobras de exploración: las hace EL ESTUDIANTE desde el control, no
+        # el profesor. Son acciones sobre el paciente (abrirle la boca, sacarle
+        # la lengua), no ayudas: no dicen nada, solo dejan ver.
+        self.maniobras = {n: False for n in MANIOBRAS}
         self.sesion_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.archivo_registro = REGISTROS / f"sesion_{self.sesion_id}.jsonl"
 
@@ -255,6 +273,9 @@ class Estado:
             "ocultar_vitales": self.ocultar_vitales,
             "solo_modelados": self.solo_modelados,
             "visual_manual": dict(self.visual_manual),
+            "maniobras": dict(self.maniobras),
+            "maniobras_disponibles": [{"id": n, "nombre": d["nombre"], "exige": d["exige"]}
+                                      for n, d in MANIOBRAS.items() if d["disponible"]],
             "visual_rango": LIMITES_VISUAL,
             "iniciado": self.iniciado,
             "corriendo": self.corriendo,
@@ -359,9 +380,6 @@ LIMITES_VISUAL = {
     "temblor": [0.0, 1.0],
     "parpados": [0.0, 1.0],
     "marcas": [0.0, 1.0],
-    # La boca no la mueve ningún escenario (en escenarios.json va [0, 0]): se
-    # abre a mano, para mostrarle la lengua al grupo cuando el profesor quiera.
-    "boca": [0.0, 1.0],
 }
 
 
@@ -513,6 +531,8 @@ class Manejador(BaseHTTPRequestHandler):
                 return self.tomar_control(cuerpo)
             if ruta == "/api/control/seleccionar":
                 return self.seleccionar(cuerpo)
+            if ruta == "/api/control/maniobra":
+                return self.maniobra(cuerpo)
             if ruta == "/api/facilitador":
                 return self.facilitador(cuerpo)
         return self.responder(404, {"error": "no existe"})
@@ -533,6 +553,37 @@ class Manejador(BaseHTTPRequestHandler):
             ESTADO.notificar()
             return self.responder(200, {"ok": True, "controlador": True})
         return self.responder(200, {"ok": True, "controlador": False})
+
+    def maniobra(self, c):
+        """El estudiante le hace algo al paciente: abrirle la boca, sacarle la
+        lengua. Queda en el registro, que después dice si exploró o no."""
+        cid = c.get("cid")
+        if cid != ESTADO.controlador:
+            return self.responder(403, {"error": "este celular no tiene el control"})
+        ESTADO.visto[cid] = time.time()
+        nombre = c.get("nombre")
+        if nombre not in MANIOBRAS:
+            return self.responder(400, {"error": "maniobra desconocida"})
+        if not MANIOBRAS[nombre]["disponible"]:
+            return self.responder(409, {"error": "esa maniobra no está disponible todavía"})
+        valor = bool(c.get("valor"))
+        ESTADO.maniobras[nombre] = valor
+        if valor:
+            # Encender una arrastra la que necesita: no se saca la lengua con
+            # la boca cerrada.
+            exige = MANIOBRAS[nombre]["exige"]
+            if exige:
+                ESTADO.maniobras[exige] = True
+        else:
+            # Apagar una apaga las que dependían de ella.
+            for otro, d in MANIOBRAS.items():
+                if d["exige"] == nombre:
+                    ESTADO.maniobras[otro] = False
+        ESTADO.registrar("maniobra", maniobra=nombre, valor=valor,
+                         intensidad=round(ESTADO.intensidad, 2))
+        ESTADO.calcular()
+        ESTADO.notificar()
+        return self.responder(200, {"ok": True, "maniobras": dict(ESTADO.maniobras)})
 
     def seleccionar(self, c):
         cid = c.get("cid")
@@ -573,7 +624,18 @@ class Manejador(BaseHTTPRequestHandler):
         elif accion == "iniciar":
             if not E.iniciado:
                 E.iniciado = True
-                E.registrar("caso_iniciado", escenario=E.escenario, rampa_s=E.rampa_s)
+                # El caso arranca mostrando el primer sistema que tenga modelo:
+                # con solo la cabeza hecha, una "vista general" del cuerpo no
+                # aporta nada y obligaba a un toque de más.
+                if E.sistema is None:
+                    primero = next((s for s in DATOS["sistemas"]
+                                    if not E.solo_modelados or sistema_modelado(s["id"])), None)
+                    if primero:
+                        E.sistema = primero["id"]
+                        subs = [v["id"] for v in primero.get("subvistas", [])]
+                        E.subvista = subs[0] if subs else None
+                E.registrar("caso_iniciado", escenario=E.escenario, rampa_s=E.rampa_s,
+                            sistema=E.sistema, subvista=E.subvista)
             if not E.corriendo:
                 E.corriendo = True
                 E.inicio_tramo = time.time()

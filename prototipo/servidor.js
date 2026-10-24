@@ -82,6 +82,19 @@ const E = {
   suscriptores: new Set(),
 };
 
+// Las maniobras que el estudiante puede hacerle al paciente desde el control.
+// "exige" es la maniobra que tiene que estar hecha primero: no se puede sacar
+// la lengua con la boca cerrada.
+const MANIOBRAS = {
+  boca:   { nombre: "Abrir la boca", exige: null, disponible: true },
+  // La lengua está lista en el servidor y en el control, pero apagada: el
+  // modelo que entregó el diseñador tiene la lengua colgada por debajo del
+  // arco dental y con el rig compartido, así que no se puede sacar sin romper
+  // la boca (ver el comentario en static/visor3d.js). El día que llegue bien,
+  // se pone disponible en true y queda andando.
+  lengua: { nombre: "Sacar la lengua", exige: "boca", disponible: false },
+};
+
 function nuevaSesion() {
   E.corriendo = false;
   E.iniciado = false;
@@ -96,6 +109,10 @@ function nuevaSesion() {
   // Parámetros visuales que el profesor fijó a mano (nombre -> valor).
   // Se sueltan al reiniciar: cada grupo empieza con el escenario tal cual.
   E.visual_manual = {};
+  // Maniobras de exploración: las hace EL ESTUDIANTE desde el control, no el
+  // profesor. Son acciones sobre el paciente (abrirle la boca, sacarle la
+  // lengua), no ayudas: no dicen nada, solo dejan ver.
+  E.maniobras = Object.fromEntries(Object.keys(MANIOBRAS).map((n) => [n, false]));
   const f = new Date();
   const p = (n) => String(n).padStart(2, "0");
   E.sesion_id = `${f.getFullYear()}${p(f.getMonth() + 1)}${p(f.getDate())}_${p(f.getHours())}${p(f.getMinutes())}${p(f.getSeconds())}`;
@@ -213,6 +230,10 @@ function calcular() {
     ocultar_vitales: E.ocultar_vitales,
     solo_modelados: E.solo_modelados,
     visual_manual: { ...E.visual_manual },
+    maniobras: { ...E.maniobras },
+    maniobras_disponibles: Object.entries(MANIOBRAS)
+      .filter(([, d]) => d.disponible)
+      .map(([id, d]) => ({ id, nombre: d.nombre, exige: d.exige })),
     visual_rango: LIMITES_VISUAL,
     iniciado: E.iniciado,
     corriendo: E.corriendo,
@@ -318,9 +339,6 @@ const LIMITES_VISUAL = {
   temblor: [0.0, 1.0],
   parpados: [0.0, 1.0],
   marcas: [0.0, 1.0],
-  // La boca no la mueve ningún escenario (en escenarios.json va [0, 0]): se
-  // abre a mano, para mostrarle la lengua al grupo cuando el profesor quiera.
-  boca: [0.0, 1.0],
 };
 
 function textoPupila(mm) {
@@ -336,6 +354,29 @@ const severidadPupila = (mm) => (mm <= 2.0 || mm >= 7.0) ? "crit" : (mm < 3.0 ||
 
 // ¿Ese sistema tiene modelo 3D? Hoy solo la cabeza.
 const sistemaModelado = (sid) => !!(DATOS.sistemas.find((s) => s.id === sid) || {}).modelo3d;
+
+/* El estudiante le hace algo al paciente: abrirle la boca, sacarle la lengua.
+ * Queda en el registro, que después dice si exploró o no. */
+function maniobra(c) {
+  if (c.cid !== E.controlador) return { codigo: 403, cuerpo: { error: "este celular no tiene el control" } };
+  E.visto[c.cid] = ahora();
+  const nombre = c.nombre;
+  if (!MANIOBRAS[nombre]) return { codigo: 400, cuerpo: { error: "maniobra desconocida" } };
+  if (!MANIOBRAS[nombre].disponible) return { codigo: 409, cuerpo: { error: "esa maniobra no está disponible todavía" } };
+  const valor = !!c.valor;
+  E.maniobras[nombre] = valor;
+  if (valor) {
+    // Encender una arrastra la que necesita: no se saca la lengua con la boca cerrada.
+    const exige = MANIOBRAS[nombre].exige;
+    if (exige) E.maniobras[exige] = true;
+  } else {
+    // Apagar una apaga las que dependían de ella.
+    for (const [otro, d] of Object.entries(MANIOBRAS)) if (d.exige === nombre) E.maniobras[otro] = false;
+  }
+  registrar("maniobra", { maniobra: nombre, valor, intensidad: Math.round(E.intensidad * 100) / 100 });
+  calcular(); notificar();
+  return { codigo: 200, cuerpo: { ok: true, maniobras: { ...E.maniobras } } };
+}
 
 function seleccionar(c) {
   if (c.cid !== E.controlador) return { codigo: 403, cuerpo: { error: "este celular no tiene el control" } };
@@ -366,7 +407,21 @@ function facilitador(c) {
     E.escenario = valor; nuevaSesion(); E.escenario = valor;
     registrar("escenario", { escenario: valor });
   } else if (accion === "iniciar") {
-    if (!E.iniciado) { E.iniciado = true; registrar("caso_iniciado", { escenario: E.escenario, rampa_s: E.rampa_s }); }
+    if (!E.iniciado) {
+      E.iniciado = true;
+      // El caso arranca mostrando el primer sistema que tenga modelo: con solo
+      // la cabeza hecha, una "vista general" del cuerpo no aporta nada y
+      // obligaba a un toque de más.
+      if (E.sistema === null) {
+        const primero = DATOS.sistemas.find((s) => !E.solo_modelados || sistemaModelado(s.id));
+        if (primero) {
+          E.sistema = primero.id;
+          const subs = (primero.subvistas || []).map((v) => v.id);
+          E.subvista = subs.length ? subs[0] : null;
+        }
+      }
+      registrar("caso_iniciado", { escenario: E.escenario, rampa_s: E.rampa_s, sistema: E.sistema, subvista: E.subvista });
+    }
     if (!E.corriendo) {
       E.corriendo = true; E.inicio_tramo = ahora();
       E.objetivo = 1; E.velocidad = 1 / Math.max(E.rampa_s, 10);
@@ -442,6 +497,7 @@ const servidor = http.createServer(async (req, res) => {
     let r = { codigo: 404, cuerpo: { error: "no existe" } };
     if (ruta === "/api/control/tomar") r = tomarControl(cuerpo);
     else if (ruta === "/api/control/seleccionar") r = seleccionar(cuerpo);
+    else if (ruta === "/api/control/maniobra") r = maniobra(cuerpo);
     else if (ruta === "/api/facilitador") r = facilitador(cuerpo);
     return responder(res, r.codigo, r.cuerpo);
   }

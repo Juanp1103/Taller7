@@ -641,7 +641,7 @@ function actualizarVisor3D(e) {
     return;
   }
   if (!visor) return;
-  visor.aplicarEstado(e.visual);
+  visor.aplicarEstado(e.visual, e.maniobras);
   const sub = e.subvista || "cara";
   if (sub !== visorSub) {
     visor.irAVista(sub, visorSub === null);

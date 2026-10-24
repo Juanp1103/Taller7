@@ -169,6 +169,74 @@ DATOS REALES VS. MODO DEMO
     ese campo vuelve a SIM en vez de mostrar algo falso.
 
 
+EL CONTROL DEL ESTUDIANTE (POR QUÉ ESTÁ ASÍ)
+---------------------------------------------
+El control es un MANDO, no una segunda pantalla clínica. A propósito NO muestra
+signos vitales, ni el estado del paciente, ni los hallazgos: todo eso vive en el
+televisor, que es donde queremos que el grupo mire. Si los números estuvieran
+también en la mano, el estudiante razonaría mirándose el aparato y la pantalla
+grande sobraría. Es la decisión de diseño más importante y conviene poder
+defenderla.
+
+Tiene DOS EJES, y por eso son dos bloques separados:
+
+  DÓNDE MIRAR   acerca el televisor a una zona (cara, labios, ojos). No le
+                hace nada al paciente, solo mueve la cámara.
+  QUÉ HACER     maniobras de exploración SOBRE el paciente, como abrirle la
+                boca. Son interruptores: se prenden y se apagan.
+
+Las maniobras las hace el ESTUDIANTE, no el profesor. Esa fue una decisión
+deliberada: si el médico le abre la boca al paciente, le está diciendo al grupo
+dónde mirar. Así el estudiante tiene que decidir él qué explorar, que es
+justamente lo que se quiere medir. Cada maniobra queda en el registro de la
+sesión, con la hora, así que después se puede ver si el grupo exploró o se
+quedó mirando de lejos. En el panel del facilitador aparecen como "LO QUE HIZO
+EL ESTUDIANTE", solo para leer.
+
+Ningún texto del control adelanta un hallazgo. Los botones dicen el SITIO ("la
+cara y el cuello", "labios y mentón") y la ACCIÓN ("le abres la boca al
+paciente"); qué se encuentra ahí lo tiene que ver el estudiante.
+
+Lo demás que muestra, y que salió de la prueba con estudiantes (donde se
+perdieron un poco con el modelo 3D):
+
+  - QUÉ ESTÁ VIENDO EL SALÓN en este momento, escrito y con un esquema de la
+    silueta que marca la zona ampliada y abre la boca cuando el estudiante se
+    la abre al paciente. Antes había que girarse hacia el televisor para saber
+    si el toque había entrado.
+  - Cuáles acercamientos ya mostró ("MOSTRADA") y cuántos le faltan, para que
+    explore ordenado sin que nadie le diga qué buscar.
+  - El caso y el reloj de la sesión.
+
+Ya NO hay "vista general": con solo la cabeza modelada, una vista del cuerpo
+entero no aportaba nada y costaba un toque de más. Al iniciar el caso, el
+televisor entra directo a Cabeza y Cuello con la cara completa.
+
+Sirve en celular y en tablet. En vertical es una columna, con el estado arriba
+y los botones abajo, al alcance del pulgar. En horizontal con ancho de sobra
+(una tablet acostada) se parte en dos paneles: el estado a la izquierda y los
+botones a la derecha. Probado en 375x667, 390x844, 744x1133, 820x1180 y
+1180x820, y en los tres estados: esperando, con el control, y cuando otro
+aparato lo tiene.
+
+Para agregar una maniobra nueva: se define en MANIOBRAS, en los DOS servidores,
+y el control la dibuja sola. "exige" encadena una con otra (no se puede sacar
+la lengua con la boca cerrada) y "disponible" la prende o la apaga.
+
+SACAR LA LENGUA está definida pero apagada. No es capricho: la lengua que
+entregó el diseñador es una placa colgada por debajo del arco dental, fuera de
+la cavidad, y además comparte el esqueleto con el arco. Mover la malla no hace
+nada (una malla con esqueleto cancela su propia transformación), pasarla a modo
+suelto la descoloca, y rotarle los huesos arrastra el arco de arriba y tapa la
+boca. Está todo explicado en static/visor3d.js. El día que el diseñador la
+ponga dentro de la boca, se cambia "disponible" a verdadero y queda andando.
+
+La siguiente maniobra obvia es ALUMBRAR CON LA LINTERNA, para ver si la pupila
+reacciona: es la exploración de cabecera más informativa en toxicología. No se
+hizo porque habría que inventar la reactividad de cada escenario, y eso lo
+tiene que decir el toxicólogo, no nosotros.
+
+
 SOLO LA CARA (ASÍ ESTÁ HOY)
 ---------------------------
 De todo el cuerpo, lo único que existe en 3D es la cabeza. Por eso el celular
@@ -203,13 +271,11 @@ siete signos físicos que el escenario calcula, cada uno con su deslizador:
   Temblor               0 a 100 %    solo extremidades (2D)
   Párpados caídos       0 a 100 %    solo cara 2D
   Marcas de venopunción 0 a 100 %    solo extremidades (2D)
-  Boca abierta          0 a 100 %    baja la mandíbula · solo cara 3D
 
-Los siete primeros ya existían en escenarios.json y las vistas ya los
-dibujaban; lo único nuevo fue poder fijarlos a mano. "Boca abierta" sí es
-nueva, y va aparte: ningún escenario la mueve (en escenarios.json va en cero),
-porque abrir la boca no es algo que le pase al paciente con el tóxico, sino
-algo que el profesor decide mostrar.
+No hay nada inventado: son exactamente los parámetros que ya existían en
+escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
+fijarlos a mano. Abrir la boca NO está acá: es una maniobra del estudiante, no
+un signo que el profesor mueva (ver la sección del control).
 
 Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
 sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
@@ -297,9 +363,10 @@ Antes: Reiniciar, elegir Caso A o B, dejar el QR visible en el televisor.
      (¿entiende el QR? ¿cuánto tarda?).
   2. Iniciar el caso. Tarea: "Examinen al paciente y díganme qué le pasa".
      No dar pistas sobre los sistemas.
-  3. Observar y anotar en el panel: ¿qué sistema abren primero? ¿miran el
-     televisor o solo el celular? ¿vuelven a la vista general? ¿alguien
-     pide el celular a quien lo tiene?
+  3. Observar y anotar en el panel: ¿en qué orden recorren los tres
+     acercamientos? ¿miran el televisor o solo el aparato? ¿se les ocurre
+     abrirle la boca, y en qué momento? ¿alguien le pide el control a quien
+     lo tiene?
   4. Cuando propongan una conducta, simular la mejoría (Caso A) o dejar que
      progrese (Caso B) y observar si notan el cambio en pantalla.
   5. Al final, 3 preguntas cortas: ¿qué fue lo más útil? ¿qué fue confuso?

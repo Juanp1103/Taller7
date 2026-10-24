@@ -229,8 +229,6 @@ const CONTROLES = [
     donde: "solo cara 2D" },
   { id: "marcas",    nom: "Marcas de venopunción", min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
     donde: "solo extremidades (2D)" },
-  { id: "boca",      nom: "Boca abierta", min: 0, max: 100, k: 100, fmt: (v) => Math.round(v * 100) + " %",
-    donde: "baja la mandíbula · solo cara 3D" },
 ];
 const arrastrandoVis = {};
 
@@ -326,6 +324,16 @@ function render(s) {
       </div>`).join("");
     return aMostrar.length > 1 ? `<div class="sis">${escapar(x.nombre).toUpperCase()}</div>${filas}` : filas;
   }).join("");
+
+  // Las maniobras las hace el estudiante desde su control; acá solo se ven,
+  // para que quien observa sepa si exploró o se quedó mirando de lejos.
+  const hechas = (s.maniobras_disponibles || []).filter((m) => s.maniobras && s.maniobras[m.id]);
+  if ((s.maniobras_disponibles || []).length) {
+    $("hall").innerHTML += `<div class="sis">LO QUE HIZO EL ESTUDIANTE</div>` + (
+      hechas.length
+        ? hechas.map((m) => `<div class="h warn"><span class="n">${escapar(m.nombre)}</span><span class="v">sí</span></div>`).join("")
+        : `<div class="h"><span class="n">Ninguna maniobra todavía</span><span class="v">—</span></div>`);
+  }
 
   $("ctl").className = "v " + (s.controlador ? "ok" : "warn");
   $("ctl").textContent = s.controlador ? "CONECTADO" : "SIN CELULAR";

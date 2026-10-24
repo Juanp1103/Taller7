@@ -52,11 +52,19 @@ const Z_IRIS = 0.8215;
 const HUECO_R = 0.50;
 const HUECO_Y = 0.45;
 
-// Con la boca del todo abierta: cuánto baja la mandíbula y cuánto sube la
-// lengua. Sin levantar la lengua queda hundida en el piso de la boca y no se
-// alcanza a ver, que es justo lo que hay que mirar.
-const GRADOS_MANDIBULA = 24;
-const GRADOS_LENGUA = 18;
+// Cuánto baja la mandíbula con la boca abierta.
+const GRADOS_MANDIBULA = 26;
+
+/* SACAR LA LENGUA no se puede con este modelo, y no es por falta de intentarlo:
+ *   - Mover la malla no hace nada: una malla con esqueleto en modo "attached"
+ *     recalcula su matriz de enlace cada cuadro y cancela el movimiento.
+ *     Pasarla a "detached" la descoloca y la encoge, porque el conjunto de la
+ *     boca viene escalado.
+ *   - Rotar los huesos de la lengua arrastra el arco dental de arriba, que
+ *     comparte pesos con ellos, y tapa la boca entera.
+ * La causa está en el archivo: la lengua es una placa colgada por debajo del
+ * arco, fuera de la cavidad, con el rig compartido. Cuando el diseñador la
+ * ponga dentro de la boca se prende la maniobra en el servidor y ya. */
 
 /* Cada vista dice QUÉ zona hay que ver, no dónde poner la cámara: la
  * distancia se calcula con la forma que tenga el panel en ese momento. Así el
@@ -269,6 +277,7 @@ function prepararModelo(raiz) {
     });
   }
 
+
   const mandibula = raiz.getObjectByName("Human_-_Lower_Jaw_1")
                  || raiz.getObjectByName("Human - Lower Jaw");
   const mandibulaBase = mandibula ? mandibula.rotation.x : 0;
@@ -327,9 +336,6 @@ export function crearVisor(contenedor) {
     for (const m of modelo.morphs) m.malla.morphTargetInfluences[m.indice] = k;
     if (modelo.mandibula) {
       modelo.mandibula.rotation.x = modelo.mandibulaBase + (k * GRADOS_MANDIBULA * Math.PI) / 180;
-    }
-    if (modelo.lengua) {
-      modelo.lengua.rotation.x = modelo.lenguaBase + (k * GRADOS_LENGUA * Math.PI) / 180;
     }
     luzBoca.intensity = k * 0.004;
   }
@@ -413,12 +419,13 @@ export function crearVisor(contenedor) {
   }
 
   /* ---------- estado clínico -> aspecto del modelo ---------- */
-  function aplicarEstado(visual) {
+  function aplicarEstado(visual, maniobras) {
     if (!visual) return;
     uniformes.uCianosis.value = visual.cianosis || 0;
     uniformes.uPalidez.value = visual.palidez || 0;
     mmObjetivo = visual.pupila_mm || 4;
-    bocaObjetivo = visual.boca || 0;
+    // Las maniobras las hace el estudiante desde el control, no el escenario.
+    bocaObjetivo = maniobras && maniobras.boca ? 1 : 0;
     const sudor = visual.sudor || 0;
     if (modelo && modelo.materialPiel) modelo.materialPiel.roughness = 1 - sudor * 0.55;
     if (modelo) for (const g of modelo.gotas) g.material.opacity = sudor * 0.45;
@@ -459,7 +466,8 @@ export function crearVisor(contenedor) {
       aplicarPupila(mmActual);
       repintar();
     }
-    // La boca también abre y cierra despacio.
+    // La boca abre y cierra despacio, y la lengua sale despacio: el salto seco
+    // se ve a tirones en el televisor.
     if (Math.abs(bocaObjetivo - bocaActual) > 0.002) {
       bocaActual = acercar(bocaActual, bocaObjetivo, 0.30, dt);
       aplicarBoca(bocaActual);
