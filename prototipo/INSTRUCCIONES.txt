@@ -6,7 +6,7 @@ QUÉ ES
 El diseño de Figma Make convertido en un prototipo que funciona de verdad con
 dos dispositivos, con el modelo 3D del maniquí de Juan integrado:
 
-  - MONITOR (televisor del salón): paciente, signos vitales, ECG y el sistema
+  - MONITOR (televisor del salón): la cara del paciente y el sistema
     que el grupo esté examinando. En "Cabeza y Cuello" se muestra el MODELO
     3D (el .glb del repo de Juan) y la cámara vuela a la cara, los labios o
     los ojos según lo que toquen en el celular.
@@ -149,21 +149,110 @@ ANTES DE LA PRUEBA CON ESTUDIANTES
   institucional.
 
 
-DATOS REALES VS. MODO DEMO
---------------------------
-  - Si el lector de la carpeta "lector_monitor" está corriendo en el mismo
-    computador (python capture_ocr.py --live), el prototipo lo detecta solo:
-    el monitor muestra "DATOS REALES DEL SIMULADOR", la FC y la FR llevan la
-    etiqueta REAL, y la evolución del paciente (pupilas, labios, sudor,
-    hallazgos) se calcula a partir de ese dato real. El profesor controla
-    todo desde LLEAP como siempre.
-  - Si no hay lector, arranca en MODO DEMO (aviso amarillo, etiquetas SIM) y
-    el facilitador maneja la evolución desde su panel:
-      · "Progresión automática": el paciente empeora solo en X minutos.
-      · "Simular mejoría (naloxona)": revierte el cuadro en ~45 s.
-      · El deslizador pone la intensidad exacta.
-  - Hoy el lector solo lee FC y FR. TA, SpO2, EtCO2 y T° siempre salen como
-    SIM hasta que se calibren sus recuadros en roi_config.json.
+CÓMO SE MANEJA EL PACIENTE (YA NO HAY CASOS)
+---------------------------------------------
+Se quitaron los casos y la curva de intensidad. El panel del profesor es ahora
+una MESA DE CONTROL de la cara: él arma el toxidrome que va a trabajar, de un
+botón o moviendo cada signo, y lo que pone es lo que se ve en el televisor.
+
+  - Los seis botones de TOXIDROME dejan los cuatro signos puestos de un toque.
+    Salen de la tabla que dieron los médicos de UCI y están en contenido.json.
+  - Debajo, cada signo tiene su deslizador. Mover uno suelta el botón: ya no es
+    el preajuste tal cual, es lo que el profesor decidió.
+  - "LO QUE SE VE EN EL TELEVISOR" se calcula de esos mismos signos, así que el
+    panel y la pantalla nunca pueden decir cosas distintas.
+
+De las seis columnas de la tabla (FC y TA, respiración, temperatura, pupilas,
+ruidos intestinales, diaforesis), la CARA puede mostrar TRES: pupilas,
+temperatura (como color de piel, fría y pálida o caliente y rubicunda) y
+diaforesis. Las otras tres no son signos de la cara. El panel las escribe en
+"EN LA CARA NO SE PUEDE VER" para que el profesor las mencione de viva voz si
+quiere, en vez de hacer como si no existieran.
+
+Hay un cuarto control, CIANOSIS, que no está en la tabla. Se dejó porque es la
+cara visible de la depresión respiratoria, que sí está en la tabla (columna
+Resp.) y que de otro modo no se podría mostrar. Si el toxicólogo prefiere que
+no aparezca, se pone en cero en cada toxidrome de contenido.json.
+
+
+NO HAY SIGNOS VITALES EN EL TELEVISOR
+--------------------------------------
+No se pudieron capturar del simulador (no conseguimos el SDK y el lector del
+monitor quedó sin calibrar), así que no se muestran. Un número simulado al lado
+de la cara estorba más de lo que ayuda, y encima invita a que el grupo razone
+con un dato que nadie midió.
+
+El lector sigue en la carpeta "lector_monitor" y el servidor lo sigue
+consultando. Si algún día contesta, los vitales vuelven solos al televisor,
+marcados como REALES. Mientras tanto, la cara ocupa la pantalla completa.
+
+
+EL CONTROL DEL ESTUDIANTE (POR QUÉ ESTÁ ASÍ)
+---------------------------------------------
+El control es un MANDO, no una segunda pantalla clínica. A propósito NO muestra
+signos vitales, ni el estado del paciente, ni los hallazgos: todo eso vive en el
+televisor, que es donde queremos que el grupo mire. Si los números estuvieran
+también en la mano, el estudiante razonaría mirándose el aparato y la pantalla
+grande sobraría. Es la decisión de diseño más importante y conviene poder
+defenderla.
+
+Tiene DOS EJES, y por eso son dos bloques separados:
+
+  DÓNDE MIRAR   acerca el televisor a una zona (cara, labios, ojos). No le
+                hace nada al paciente, solo mueve la cámara.
+  QUÉ HACER     maniobras de exploración SOBRE el paciente, como abrirle la
+                boca. Son interruptores: se prenden y se apagan.
+
+Las maniobras las hace el ESTUDIANTE, no el profesor. Esa fue una decisión
+deliberada: si el médico le abre la boca al paciente, le está diciendo al grupo
+dónde mirar. Así el estudiante tiene que decidir él qué explorar, que es
+justamente lo que se quiere medir. Cada maniobra queda en el registro de la
+sesión, con la hora, así que después se puede ver si el grupo exploró o se
+quedó mirando de lejos. En el panel del facilitador aparecen como "LO QUE HIZO
+EL ESTUDIANTE", solo para leer.
+
+Ningún texto del control adelanta un hallazgo. Los botones dicen el SITIO ("la
+cara y el cuello", "labios y mentón") y la ACCIÓN ("le abres la boca al
+paciente"); qué se encuentra ahí lo tiene que ver el estudiante.
+
+Lo demás que muestra, y que salió de la prueba con estudiantes (donde se
+perdieron un poco con el modelo 3D):
+
+  - QUÉ ESTÁ VIENDO EL SALÓN en este momento, escrito y con un esquema de la
+    silueta que marca la zona ampliada y abre la boca cuando el estudiante se
+    la abre al paciente. Antes había que girarse hacia el televisor para saber
+    si el toque había entrado.
+  - Cuáles acercamientos ya mostró ("MOSTRADA") y cuántos le faltan, para que
+    explore ordenado sin que nadie le diga qué buscar.
+  - El caso y el reloj de la sesión.
+
+Ya NO hay "vista general": con solo la cabeza modelada, una vista del cuerpo
+entero no aportaba nada y costaba un toque de más. Al iniciar el caso, el
+televisor entra directo a Cabeza y Cuello con la cara completa.
+
+Sirve en celular y en tablet. En vertical es una columna, con el estado arriba
+y los botones abajo, al alcance del pulgar. En horizontal con ancho de sobra
+(una tablet acostada) se parte en dos paneles: el estado a la izquierda y los
+botones a la derecha. Probado en 375x667, 390x844, 744x1133, 820x1180 y
+1180x820, y en los tres estados: esperando, con el control, y cuando otro
+aparato lo tiene.
+
+Para agregar una maniobra nueva: se define en MANIOBRAS, en los DOS servidores,
+y el control la dibuja sola. "exige" encadena una con otra (no se puede sacar
+la lengua con la boca cerrada) y "disponible" la prende o la apaga.
+
+SACAR LA LENGUA está definida pero apagada. No es capricho: la lengua que
+entregó el diseñador es una placa colgada por debajo del arco dental, fuera de
+la cavidad, y además comparte el esqueleto con el arco. Mover la malla no hace
+nada (una malla con esqueleto cancela su propia transformación), pasarla a modo
+suelto la descoloca, y rotarle los huesos arrastra el arco de arriba y tapa la
+boca. Está todo explicado en static/visor3d.js. El día que el diseñador la
+ponga dentro de la boca, se cambia "disponible" a verdadero y queda andando.
+
+La siguiente maniobra obvia es ALUMBRAR CON LA LINTERNA, para ver si la pupila
+reacciona: es la exploración de cabecera más informativa en toxicología. No se
+hizo porque habría que inventar la reactividad de cada escenario, y eso lo
+tiene que decir el toxicólogo, no nosotros.
 
 
 SOLO LA CARA (ASÍ ESTÁ HOY)
@@ -188,68 +277,6 @@ relacionan lo que ven en la cara con el estado del paciente, y si los tres
 acercamientos les sirven o les estorban.
 
 
-SIGNOS FÍSICOS A MANO (para el profesor)
------------------------------------------
-En el panel del facilitador, dentro de "Evolución del paciente", están los
-siete signos físicos que el escenario calcula, cada uno con su deslizador:
-
-  Pupilas               0,8 a 9 mm   ojos en 3D
-  Cianosis              0 a 100 %    labios y piel · cara 3D y 2D
-  Palidez               0 a 100 %    piel · cara 3D y 2D
-  Sudoración            0 a 100 %    gotas y brillo · cara 3D, mano 2D
-  Temblor               0 a 100 %    solo extremidades (2D)
-  Párpados caídos       0 a 100 %    solo cara 2D
-  Marcas de venopunción 0 a 100 %    solo extremidades (2D)
-
-No hay nada inventado: son exactamente los parámetros que ya existían en
-escenarios.json y que las vistas ya dibujaban. Lo único nuevo es poder
-fijarlos a mano.
-
-Apenas se mueve uno, ese signo queda en manual (se pone en ámbar) y manda
-sobre el escenario y sobre el deslizador de intensidad. Los demás siguen en
-automático. El botón "auto" de cada fila suelta ese solo; "Todo en
-automático" los suelta todos; reiniciar también, así que cada grupo arranca
-igual sin que nadie se acuerde de bajarlos.
-
-La columna de la derecha dice dónde se nota cada uno, y conviene leerla: hoy
-el celular solo deja entrar a la cabeza y la cabeza se dibuja con el modelo
-3D, así que TEMBLOR y MARCAS (que viven en la mano) y PÁRPADOS CAÍDOS (que
-vive en la cara 2D) no se van a ver a menos que apaguen la casilla "Solo los
-sistemas que ya tienen modelo 3D". Se dejaron igual para que estén listos
-cuando el resto del cuerpo exista.
-
-Sirven también con el lector conectado. De hecho ahí es donde más sirven,
-porque el monitor real no reporta nada de esto y los demás controles quedan
-desactivados: son los únicos signos que el profesor puede mover en vivo.
-
-Cada cambio queda en el registro de la sesión (visual_manual con el parámetro
-y el valor, visual_auto al soltar uno, visual_todo_auto al soltar todos), así
-que después se puede reconstruir en qué momento intervino el profesor y
-separar lo que el estudiante vio solo de lo que alguien provocó.
-
-Con las pupilas en manual, el hallazgo escrito en el panel del facilitador se
-recalcula a partir de los milímetros reales (puntiformes / mióticas /
-normales / midriáticas) y se marca "(manual)", para que el panel no diga una
-cosa y la pantalla muestre otra.
-
-
-VER EL MODELO A PANTALLA COMPLETA
-----------------------------------
-En el panel del facilitador hay una casilla: "Ocultar signos vitales y ECG
-(imagen a pantalla completa)". Al prenderla, la columna derecha del televisor
-desaparece y la imagen del paciente pasa de 820 a 1500 px de ancho. Sirve para
-cuando quieran que el grupo mire el signo físico y nada más, o para enseñarle
-el modelo a alguien de lejos.
-
-Desde el computador del televisor también se puede con la tecla V, sin tener
-que ir al panel. Es la misma casilla: lo que se prenda en un lado se ve en el
-otro, y queda en el registro de la sesión.
-
-Ojo con usarla durante una prueba de usuario: esconder los vitales cambia lo
-que el estudiante tiene para razonar, así que si la usan con un grupo hay que
-anotarlo, porque ese grupo deja de ser comparable con los demás.
-
-
 LOS HALLAZGOS TAMPOCO SE ESCRIBEN EN EL TELEVISOR
 --------------------------------------------------
 La vista ampliada de un sistema ya NO lista los hallazgos ("Pupilas:
@@ -267,35 +294,29 @@ observa sepa qué hay en pantalla y pueda anotar si el grupo lo mencionó o se
 le pasó. Esa es justamente la medición interesante.
 
 
-EL DIAGNÓSTICO NO APARECE EN PANTALLA (A PROPÓSITO)
----------------------------------------------------
-El diseño de Figma decía "Sobredosis de Opioides" en el título. Lo cambié a
-"Caso A · Paciente en urgencias": si el televisor dice el diagnóstico, se le
-regala la respuesta al grupo. Si lo quieren mostrar (por ejemplo en una
-demo para los profes), hay una casilla en el panel del facilitador.
-
-
 REGISTRO PARA ANALIZAR LAS PRUEBAS
 ----------------------------------
 Todo queda guardado con hora en la carpeta "registros" (un archivo por
 sesión): qué sistema abrieron y cuándo, cuánto tardaron desde el inicio del
-caso, pausas, cambios de intensidad y las notas que escriban en el panel del
+sesión, pausas, toxidromes, cada signo que el profesor mueva, cada
+acercamiento y cada maniobra del
 facilitador. "Reiniciar" empieza un archivo nuevo, así que reinicien entre
 un grupo y el siguiente. También se puede descargar desde el panel.
 
 
 GUION SUGERIDO PARA UNA PRUEBA DE USUARIO (15-20 min por grupo)
 ---------------------------------------------------------------
-Antes: Reiniciar, elegir Caso A o B, dejar el QR visible en el televisor.
+Antes: Reiniciar, elegir el toxidrome, dejar el QR visible en el televisor.
   1. Pedir a un estudiante que conecte su celular sin explicarle cómo
      (¿entiende el QR? ¿cuánto tarda?).
   2. Iniciar el caso. Tarea: "Examinen al paciente y díganme qué le pasa".
      No dar pistas sobre los sistemas.
-  3. Observar y anotar en el panel: ¿qué sistema abren primero? ¿miran el
-     televisor o solo el celular? ¿vuelven a la vista general? ¿alguien
-     pide el celular a quien lo tiene?
-  4. Cuando propongan una conducta, simular la mejoría (Caso A) o dejar que
-     progrese (Caso B) y observar si notan el cambio en pantalla.
+  3. Observar y anotar en el panel: ¿en qué orden recorren los tres
+     acercamientos? ¿miran el televisor o solo el aparato? ¿se les ocurre
+     abrirle la boca, y en qué momento? ¿alguien le pide el control a quien
+     lo tiene?
+  4. Cuando propongan una conducta, cambiar el toxidrome o mover un signo y
+     observar si notan el cambio en la pantalla.
   5. Al final, 3 preguntas cortas: ¿qué fue lo más útil? ¿qué fue confuso?
      ¿qué le quitarían o agregarían?
 Variantes para comparar entre grupos: con y sin "conteo de críticos en el
@@ -304,45 +325,48 @@ celular" (casilla en el panel), para ver si los números guían demasiado.
 
 EL MODELO 3D (static/modelo.glb)
 --------------------------------
-El modelo que se usa hoy es la cabeza completa que entregó el diseñador, con
-los OJOS YA MONTADOS DENTRO DE LA CARA y los párpados abiertos. Reemplazó a la
-cabeza del repo de Juan (que tenía los ojos cerrados) y al ojo suelto que se
-mostraba aparte: ya no existen static/ojo.glb ni static/visorojos.js, todo lo
-dibuja static/visor3d.js sobre una sola escena.
+Hoy el modelo es un BUSTO: cabeza, cuello y hombros, con textura de piel, los
+dos ojos montados en las órbitas, los párpados abiertos y la boca modelada por
+dentro (mandíbula, dentadura, faringe y lengua). Reemplazó al modelo anterior,
+que era solo una cabeza.
 
 Cómo está armado el archivo:
 
-  - Nodos: "Head" (la cabeza, una sola malla con textura) y "Eye" / "Eye_2"
-    (los dos ojos, cada uno con su material "Iris" y su material de globo).
+  - Nodos: "Eye" y "Eye001" (los dos ojos, cada uno con su material de iris),
+    "grp_blendShapes_01" (la cabeza) y "Human_-_Denture" (la boca por dentro,
+    con su propio esqueleto de 15 huesos).
     Que los ojos sean nodos aparte es lo que deja mover cada pupila por su
     cuenta; si el diseñador los une en una sola malla, se rompe.
+  - La cabeza trae un morph llamado "jawOpen" que separa los labios, y una
+    animación de 21 segundos que lo mueve. La animación NO se usa: la app fija
+    el valor cuando quiere, que es más útil que reproducir una animación.
   - Trae texturas de color, normales y rugosidad. La app NO las reemplaza:
     las tiñe por encima, así que la piel conserva su detalle.
-  - No trae animaciones ni morph targets. El diseñador mencionó una
-    "animación de palidez": esa no viaja en el .glb (glTF no exporta
-    animaciones de material de Blender). No hace falta: la palidez, la
-    cianosis, el brillo de sudor y el tamaño de pupila los calcula la app a
-    partir del escenario, y además se pueden fijar a mano desde el panel.
 
 Lo que la app le pinta encima (static/visor3d.js):
 
-  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara
-    en coordenadas de mundo para que aguante la escala y la rotación del
-    nodo. El radio es 0,021 (unos 2,5 cm): queda en los labios y se desvanece
-    antes de la barbilla.
+  - CIANOSIS: un shader tiñe de morado alrededor de la boca, con la máscara en
+    coordenadas de mundo para que aguante la escala y la rotación del nodo.
+    Los labios son una elipse ancha y baja, así que la máscara aplasta el eje
+    X: con una esfera el morado se subía al bigote y bajaba a la barbilla.
   - PALIDEZ: tiñe toda la cara, sin tocar la textura.
   - SUDORACIÓN: baja la rugosidad de la piel (brillo) y aparecen gotitas sobre
     frente, sienes y mejillas. Las gotas se colocan lanzando rayos de frente
     contra la malla; si el rayo pega en un borde muy inclinado (una oreja, el
-    contorno) se descarta, para que ninguna quede flotando fuera de la
-    silueta.
+    contorno) se descarta, para que ninguna quede flotando fuera de la silueta.
   - PUPILAS: ver abajo.
+  - BOCA ABIERTA: ver abajo.
 
 Las vistas (cara / labios / ojos) las elige el estudiante desde el celular y
 el televisor hace el zoom. Cada vista se declara como una REGIÓN (centro,
 ancho, alto y campo de visión) y la distancia de cámara se calcula con la
 proporción real del panel. Por eso el encuadre sigue siendo correcto cuando
 se esconden los signos vitales y el panel pasa de 820 a 1500 px.
+
+Las transiciones (la pupila que se cierra, la boca que se abre) van por TIEMPO
+y no por cuadro. En un computador lento, o con tarjeta gráfica por software,
+el bucle corre a dos o tres cuadros por segundo y una interpolación por cuadro
+dejaba la pupila a medio camino para siempre.
 
 
 LAS PUPILAS (se dibujan, no vienen en el modelo)
@@ -352,67 +376,96 @@ iris, y su diámetro sale directo del valor en milímetros del escenario o del
 deslizador manual. Dos milímetros son dos milímetros, no una malla escalada
 a ojo.
 
-Las constantes medidas sobre este modelo están al principio de
-static/visor3d.js:
+El tamaño de una unidad del modelo en milímetros se saca de la escala del nodo
+del ojo, no está escrito a mano: si el diseñador reexporta a otra escala, la
+pupila sigue midiendo bien. En esta entrega da 12,93 mm por unidad.
 
-  MM_POR_UNIDAD = 12     1 unidad del modelo son 12 mm (el globo mide 2
-                         unidades = 24 mm, que es un ojo adulto).
+Las otras constantes están al principio de static/visor3d.js:
+
   Z_IRIS = 0,8215        a qué altura del nodo del ojo queda el iris.
   HUECO_R / HUECO_Y      el tamaño de la ventana que se abre en la córnea.
 
 Dos detalles del archivo que la app compensa (si el diseñador los corrige, se
 puede borrar el arreglo):
 
+  - El iris no tiene color ni textura: sin la app los ojos salen blancos. La
+    app le pone color de iris y le dibuja la pupila.
   - La córnea es parte de la misma malla cerrada y tapaba el iris. La app le
     abre una ventana con un discard en el shader, con el borde justo en el
     limbo. Se hace con discard y no con transparencia porque así no hay
     errores de orden de dibujo.
   - Dentro del nodo del ojo el iris mira hacia +Y, no hacia +Z, porque el nodo
-    trae su propia rotación de 90°. La pupila se coloca y se gira de acuerdo
-    con eso. Si en una entrega futura la pupila desaparece, mirar ahí
-    primero.
+    trae su propia rotación de 90°. Si en una entrega futura la pupila
+    desaparece, mirar ahí primero.
 
-La pupila se mueve suavizada, como una reacción pupilar, en vez de saltar de
-un tamaño a otro.
+
+LA BOCA ABIERTA (y por qué la lengua todavía no sirve)
+-------------------------------------------------------
+En el panel del facilitador, entre los signos a mano, hay un deslizador "Boca
+abierta". Abrirla son DOS cosas a la vez: el morph "jawOpen" separa los labios
+y, al mismo tiempo, la app rota el hueso de la mandíbula. Con el morph solo se
+vería una boca abierta con los dientes apretados, porque la dentadura es un
+objeto aparte que el morph no toca.
+
+La idea era mostrar CIANOSIS CENTRAL en la lengua, que es donde de verdad se
+valora y lo que pidieron los médicos de UCI. El código para teñirla ya está
+hecho y funciona. Lo que no sirve todavía es el modelo: la dentadura que
+entregó el diseñador es una pieza de prótesis dental —un arco de arriba y uno
+de abajo sobre encías gruesas— y la lengua es una placa colgada POR DEBAJO del
+arco inferior, fuera de la cavidad de la boca. Desde la cara, por mucho que se
+abra la mandíbula o se rote la lengua, solo asoma una franja.
+
+Hay que pedírselo al diseñador así: la lengua tiene que quedar DENTRO de la
+boca, apoyada en el piso, entre los dos arcos dentales, y a la escala de esta
+cabeza. Mientras tanto el deslizador sirve para mostrar la mandíbula caída —
+que en un paciente obnubilado es un hallazgo real— y la cianosis central queda
+esperando.
 
 
 EL PESO DEL MODELO (importante si lo reemplazan)
 ------------------------------------------------
-El .glb que entregó el diseñador pesaba 4,72 MB por las texturas en 4K, y el
-televisor tardaba entre 14 y 22 segundos en mostrar la cara. Se comprimió a
-352 KB sin tocar la malla:
+El .glb que entregó el diseñador pesaba 21,8 MB, de los cuales 19,2 MB eran
+texturas en 2048 sin comprimir (un solo mapa de normales pesaba 14,4 MB). Se
+comprimió a 2,8 MB sin tocar la malla:
 
   gltf-transform resize original.glb paso1.glb --width 1024 --height 1024
   gltf-transform webp paso1.glb static/modelo.glb
 
-A 1024 px no se nota la diferencia en un televisor y el modelo queda listo
-casi al instante. Además la app guarda el modelo ya interpretado en memoria,
-así que cambiar de vista o recargar el monitor no lo vuelve a procesar.
+A 1024 no se nota la diferencia en un televisor. Además la app interpreta el
+modelo UNA sola vez y lo reutiliza, así que cambiar de vista o volver a abrir
+el sistema no lo vuelve a procesar.
 
 OJO: NO usar "gltf-transform optimize". Esa pasada junta las mallas y deja los
 dos ojos en un solo nodo, con lo cual las pupilas dejan de moverse por
 separado. Tampoco usar Draco: el descompresor no está en static/vendor y el
 salón puede estar sin internet.
 
-Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo
-tiene otra escala u orientación hay que volver a medir y ajustar, en
-static/visor3d.js, la constante VISTAS, el punto BOCA y las constantes de los
-ojos de aquí arriba.
+El modelo NO se clona para cada visor: clonar una malla con esqueleto deja los
+huesos apuntando al original y la mandíbula dejaría de moverse. Como el
+televisor muestra un visor a la vez, se reutiliza el mismo modelo.
+
+Para cambiar el modelo: reemplazar static/modelo.glb. Si el modelo nuevo tiene
+otra escala u orientación hay que volver a medir y ajustar, en
+static/visor3d.js, la constante VISTAS, el punto BOCA y los puntos de las
+gotas de sudor.
 
 
 QUÉ LE FALTA AL MODELO (para pedirle al diseñador)
 --------------------------------------------------
-  1. LENGUA, como malla o material propio y con la boca entreabierta. El
-     diseñador dijo que la manda con el producto final. La cianosis central se
-     valora en la lengua y la mucosa, no en los labios; tenerlas las dos deja
-     mostrar la diferencia entre central y periférica.
-  2. LABIOS separados como malla o material propio, para que la cianosis se
-     pinte exacta en vez de aproximarla por distancia a la boca.
-  3. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
+  1. LA LENGUA DENTRO DE LA BOCA (ver arriba). Es lo único que bloquea la
+     cianosis central, que es lo que más les interesó a los médicos.
+  2. Color o textura en el iris: hoy los ojos salen blancos y el color lo pone
+     la app. Van tres entregas con lo mismo.
+  3. Que los ojos cuelguen de los grupos "grp_eye_l" y "grp_eye_r", que están
+     vacíos: hoy quedaron sueltos en la raíz de la escena, así que si algún
+     día anima la cabeza, los ojos se quedan atrás.
+  4. Exportar las texturas en 1024, para no tener que comprimirlas en cada
+     entrega.
+  5. El resto del cuerpo (tórax, abdomen, extremidades): esos sistemas siguen
      con ilustraciones 2D.
 
-Ya resueltos: párpados abiertos y ojos integrados en la cara (entrega del
-modelo nuevo), y texturas de piel (antes el color lo ponía toda la app).
+Ya resueltos: párpados abiertos, ojos integrados en la cara, texturas de piel,
+cuello y hombros, y la boca modelada por dentro.
 
 
 ARCHIVOS
@@ -420,13 +473,15 @@ ARCHIVOS
   servidor.py        El servidor en Python (sin librerías externas).
   servidor.js        El MISMO servidor en Node.js, para computadores sin
                      Python. Los dos sirven las mismas páginas y datos.
-  escenarios.json    TODO el contenido clínico: signos vitales, hallazgos por
-                     sistema y cómo cambian. Se edita sin tocar código.
-                     Son valores de PRUEBA: hay que pasarlos por el profesor
-                     de toxicología antes de usarlos como contenido final.
+  contenido.json     TODO el contenido: los cuatro signos que la cara sabe
+                     mostrar, los seis toxidromes con sus valores, y qué pide
+                     la tabla que la cara no puede dar. Se edita sin tocar
+                     código. Los valores salen de la tabla de los médicos de
+                     UCI pero siguen PENDIENTES de que el toxicólogo los
+                     confirme uno por uno.
   static/            Las páginas (monitor, control, facilitador).
-  static/modelo.glb  El modelo 3D de la cabeza, con los ojos adentro (del
-                     diseñador), comprimido a 352 KB.
+  static/modelo.glb  El modelo 3D: busto con los ojos y la boca adentro (del
+                     diseñador), comprimido a 2,8 MB.
   static/visor3d.js  El visor 3D: piel, cianosis, gotas de sudor, pupilas en
                      milímetros y vuelos de cámara.
   static/vendor/     Three.js local (para que funcione sin internet).
@@ -435,6 +490,13 @@ ARCHIVOS
   PUNTO_DE_ACCESO.bat  Para cuando el wifi de la universidad no deja que el
                      celular vea al computador (ver la sección del wifi).
   red/               El ayudante de PowerShell que usa ese .bat.
+  lector_monitor/    El lector de la pantalla del simulador: mira el monitor,
+                     reconoce los números y los publica para que el prototipo
+                     los use como datos reales. Hay que calibrarlo una vez por
+                     laboratorio (lector_monitor/LEEME.txt).
+  lector_url.txt     Opcional. Solo si el lector corre en OTRO computador: una
+                     línea con su dirección, por ejemplo
+                     http://192.168.137.25:5050/vitals
 
 
 QUÉ FALTA / SIGUIENTE
@@ -443,6 +505,6 @@ QUÉ FALTA / SIGUIENTE
     central se pueda mostrar de verdad.
   - Modelar el resto del cuerpo para reemplazar las ilustraciones 2D de
     tórax, abdomen y extremidades.
-  - Capa de decisión (Flujo B: confirmar naloxona, etc.) en el celular:
-    queda pendiente de que los profes decidan si va en el MVP.
-  - Validar los valores clínicos de escenarios.json con el toxicólogo.
+  - Que el profesor pueda guardar un toxidrome armado por él, además de los
+    seis que vienen.
+  - Validar los valores de contenido.json con el toxicólogo, uno por uno.

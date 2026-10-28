@@ -1,0 +1,124 @@
+{
+  "_nota": "TODO el contenido del prototipo. Los toxidromes están copiados de la tabla que dieron los médicos de UCI (columnas: FC y TA, respiración, temperatura, pupilas, ruidos intestinales, diaforesis). De esas seis columnas la cara en 3D puede mostrar TRES: pupilas, temperatura (como color de la piel) y diaforesis. Las otras tres no son signos de la cara y por eso no están: cada toxidrome dice cuáles son, para que el profesor las mencione si quiere.",
+
+  "signos": {
+    "pupila_mm": {
+      "nombre": "Pupilas",
+      "min": 0.8, "max": 9.0, "normal": 4.0, "paso": 0.1,
+      "unidad": "mm",
+      "donde": "los dos ojos en 3D",
+      "escala": [
+        [0.0, "Puntiformes (pinpoint)", "crit"],
+        [2.1, "Mióticas", "warn"],
+        [3.1, "Sin cambios", "ok"],
+        [5.1, "Dilatadas", "warn"],
+        [7.1, "Dilatadas (midriasis marcada)", "crit"]
+      ]
+    },
+    "piel": {
+      "nombre": "Piel y temperatura",
+      "min": -1.0, "max": 1.0, "normal": 0.0, "paso": 0.01,
+      "unidad": "",
+      "donde": "toda la cara en 3D",
+      "extremos": ["Fría y pálida", "Caliente y rubicunda"],
+      "escala": [
+        [-1.0, "Fría y pálida", "warn"],
+        [-0.25, "Sin cambios", "ok"],
+        [0.25, "Caliente y rubicunda", "warn"]
+      ]
+    },
+    "sudor": {
+      "nombre": "Diaforesis",
+      "min": 0.0, "max": 1.0, "normal": 0.0, "paso": 0.01,
+      "unidad": "%",
+      "donde": "brillo y gotas en la cara en 3D",
+      "escala": [
+        [0.0, "Piel seca", "ok"],
+        [0.3, "Sudorosa", "warn"],
+        [0.7, "Diaforesis profusa", "crit"]
+      ]
+    },
+    "cianosis": {
+      "nombre": "Cianosis",
+      "min": 0.0, "max": 1.0, "normal": 0.0, "paso": 0.01,
+      "unidad": "%",
+      "donde": "labios, y la lengua al abrir la boca",
+      "escala": [
+        [0.0, "Labios rosados", "ok"],
+        [0.3, "Labios violáceos", "warn"],
+        [0.65, "Cianosis marcada", "crit"]
+      ]
+    }
+  },
+
+  "_nota_cianosis": "La cianosis no está en la tabla. Se dejó porque es la cara visible de la depresión respiratoria, que sí está (columna Resp.) y que de otro modo no se podría mostrar. Si el toxicólogo prefiere que no aparezca, se pone en cero en cada toxidrome.",
+
+  "toxidromes": [
+    {
+      "id": "basal",
+      "nombre": "Paciente normal",
+      "nota": "Punto de partida, todo sin alteraciones.",
+      "no_visible": "",
+      "signos": { "pupila_mm": 4.0, "piel": 0.0, "sudor": 0.0, "cianosis": 0.0 }
+    },
+    {
+      "id": "anticolinergico",
+      "nombre": "Anticolinérgico",
+      "nota": "Pupilas dilatadas · caliente · piel seca",
+      "no_visible": "FC y TA altas · respiración sin cambios · ruidos intestinales ausentes",
+      "signos": { "pupila_mm": 7.5, "piel": 0.85, "sudor": 0.0, "cianosis": 0.0 }
+    },
+    {
+      "id": "colinergico",
+      "nombre": "Colinérgico",
+      "nota": "Pupilas puntiformes · temperatura normal · diaforesis",
+      "no_visible": "FC, TA y respiración sin cambios · ruidos intestinales aumentados",
+      "signos": { "pupila_mm": 1.5, "piel": 0.0, "sudor": 1.0, "cianosis": 0.0 }
+    },
+    {
+      "id": "opioide",
+      "nombre": "Opioide",
+      "nota": "Pupilas puntiformes · frío · piel seca",
+      "no_visible": "FC y TA bajas · respiración muy deprimida · ruidos intestinales ausentes",
+      "signos": { "pupila_mm": 1.4, "piel": -0.6, "sudor": 0.0, "cianosis": 0.85 }
+    },
+    {
+      "id": "simpaticomimetico",
+      "nombre": "Simpaticomimético",
+      "nota": "Pupilas dilatadas · caliente · diaforesis",
+      "no_visible": "FC, TA y respiración altas · ruidos intestinales aumentados",
+      "signos": { "pupila_mm": 7.0, "piel": 0.5, "sudor": 0.9, "cianosis": 0.0 }
+    },
+    {
+      "id": "sedante",
+      "nombre": "Sedante / hipnótico",
+      "nota": "Pupilas sin cambios · frío · piel seca",
+      "no_visible": "FC, TA y respiración bajas · ruidos intestinales ausentes",
+      "signos": { "pupila_mm": 4.0, "piel": -0.45, "sudor": 0.0, "cianosis": 0.3 }
+    }
+  ],
+
+  "sistemas": [
+    {
+      "id": "cabeza",
+      "nombre": "Cabeza y Cuello",
+      "icono": "cabeza",
+      "modelo3d": true,
+      "subvistas": [
+        { "id": "cara", "nombre": "Cara completa" },
+        { "id": "labios", "nombre": "Labios / boca" },
+        { "id": "ojos", "nombre": "Ojos / pupilas" }
+      ]
+    }
+  ],
+
+  "signos_vitales": {
+    "fc":    { "nombre": "FC",    "unidad": "lpm",  "warn": [60, 100], "crit": [50, 130] },
+    "ta":    { "nombre": "TA",    "unidad": "mmHg", "warn": [100, 140], "crit": [90, 180] },
+    "spo2":  { "nombre": "SpO₂",  "unidad": "%",    "warn": [94, 101], "crit": [88, 101] },
+    "fr":    { "nombre": "FR",    "unidad": "rpm",  "warn": [12, 20], "crit": [8, 30] },
+    "etco2": { "nombre": "EtCO₂", "unidad": "mmHg", "warn": [35, 45], "crit": [25, 55] },
+    "temp":  { "nombre": "T°",    "unidad": "°C",   "warn": [36, 38], "crit": [35, 39], "decimales": 1 }
+  },
+  "_nota_vitales": "Solo se usan cuando el lector del monitor del simulador está conectado y manda valores REALES. Sin lector, el televisor no muestra vitales: un número simulado al lado de la cara estorba más de lo que ayuda."
+}

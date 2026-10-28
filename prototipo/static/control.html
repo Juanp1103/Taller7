@@ -6,51 +6,167 @@
 <meta name="theme-color" content="#070d17">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>SimClin · Control remoto</title>
+<!--
+  EL CONTROL DEL ESTUDIANTE
+  =========================
+  Es un MANDO, no una segunda pantalla clínica. A propósito no muestra signos
+  vitales, ni el estado del paciente, ni los hallazgos: todo eso está en el
+  televisor, que es donde queremos que el grupo mire. Si los números estuvieran
+  también en la mano, el estudiante razonaría mirándose el celular.
+
+  Tiene dos ejes, y por eso son dos bloques:
+    DÓNDE MIRAR   acercar el televisor a una zona. No cambia al paciente.
+    QUÉ HACER     maniobras de exploración sobre el paciente (abrirle la boca,
+                  pedirle que saque la lengua).
+                  Las hace el estudiante, no el profesor, y quedan registradas.
+
+  Nada de lo que dice esta pantalla adelanta un hallazgo. Los botones dicen el
+  SITIO y la ACCIÓN; qué se encuentra ahí lo tiene que ver el estudiante.
+
+  Sirve igual en celular y en tablet: en horizontal con ancho de sobra se parte
+  en dos paneles, con el estado a la izquierda y los botones a la derecha.
+-->
 <style>
   :root {
     --fondo: #070d17; --tarjeta: #0e1826; --tarjeta-2: #132033; --borde: #1c2d42; --borde-2: #27405a;
     --texto: #e8eef6; --texto-2: #8e9fb4; --texto-3: #5d6e83;
     --cian: #22c3e6; --ok: #22c55e; --warn: #f5a524; --crit: #f04848;
+    --ambar: #f5a524;
     --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
     --sans: "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    --r: 18px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--sans); min-height: 100%; }
-  body { padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--sans); }
+  body {
+    padding: calc(env(safe-area-inset-top) + 14px) max(env(safe-area-inset-left), 16px)
+             calc(env(safe-area-inset-bottom) + 18px) max(env(safe-area-inset-right), 16px);
+    max-width: 560px; margin: 0 auto; user-select: none; -webkit-user-select: none;
+    display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh;
+  }
   .top { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--cian); }
   .sync { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); letter-spacing: .1em; }
   .sync .p { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .sync.off { color: var(--warn); }
-  h1 { font-size: 30px; margin: 14px 0 4px; letter-spacing: -.01em; }
-  .ayuda { color: var(--texto-2); font-size: 14.5px; margin: 0 0 18px; }
 
-  .fila { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 16px; margin: 0 0 10px; border-radius: 18px; background: var(--tarjeta); border: 1px solid var(--borde); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform .12s ease, border-color .2s, background .2s; }
-  .fila:active { transform: scale(.98); }
-  .fila .ic { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: var(--tarjeta-2); display: grid; place-items: center; color: var(--texto-2); }
-  .fila .ic svg { width: 23px; height: 23px; }
-  .fila .t { flex: 1; min-width: 0; }
-  .fila .n { font-weight: 650; font-size: 16.5px; }
-  .fila .s { font-family: var(--mono); font-size: 12px; margin-top: 4px; color: var(--texto-3); }
-  .fila .s.crit { color: var(--crit); }
-  .fila .s.warn { color: var(--warn); }
-  .fila .fl { color: var(--texto-3); font-size: 20px; }
-  .fila.activa { border-color: var(--cian); background: linear-gradient(90deg, rgba(34,195,230,.14), var(--tarjeta) 70%); }
-  .fila.activa .ic { color: var(--cian); background: rgba(34,195,230,.14); }
-  .en-monitor { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--cian); border: 1px solid rgba(34,195,230,.5); border-radius: 999px; padding: 5px 8px; white-space: nowrap; }
-  .general { margin-bottom: 16px; }
-  .subvistas { display: flex; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; padding: 0 4px 0 74px; }
-  .sub { font: inherit; font-size: 13.5px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto-2); cursor: pointer; }
-  .sub:active { transform: scale(.97); }
-  .sub.activa { border-color: var(--cian); color: var(--cian); background: rgba(34,195,230,.12); font-weight: 650; }
-  .separador { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--texto-3); margin: 4px 2px 10px; }
+  #panel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .cabecera { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 16px 0 14px; }
+  .cabecera .caso { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+  .cabecera .reloj { font-family: var(--mono); font-size: 19px; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+  .cabecera .reloj.pausa { color: var(--warn); }
 
-  .aviso { margin-top: 30vh; text-align: center; padding: 0 10px; }
+  .tablero { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+  /* ---- lo que está viendo el salón ---- */
+  .tv {
+    border-radius: var(--r); padding: 14px 16px 15px;
+    background: linear-gradient(135deg, rgba(34,195,230,.13), var(--tarjeta) 72%);
+    border: 1px solid rgba(34,195,230,.42);
+    display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0;
+    transition: border-color .3s, background .3s;
+  }
+  .tv.destello { border-color: var(--cian); background: linear-gradient(135deg, rgba(34,195,230,.3), var(--tarjeta) 72%); }
+  .tv-et { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; color: var(--cian); }
+  .tv-et .p { width: 7px; height: 7px; border-radius: 50%; background: var(--cian); }
+  .tv-n { font-size: 20px; font-weight: 650; margin-top: 9px; letter-spacing: -.01em; }
+  .tv-s { font-size: 13.5px; color: var(--texto-2); margin-top: 3px; }
+  .tv-fig { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 10px 0 2px; }
+  .tv-fig svg { width: 100%; height: 100%; max-height: 300px; max-width: 245px; }
+  .tv-fig .silueta { fill: none; stroke: var(--borde-2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tv-fig .rasgo { fill: none; stroke: var(--texto-3); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tv-fig .zona { fill: var(--cian); opacity: 0; transition: opacity .35s; }
+  .tv-fig .zona.si { opacity: .22; }
+  .tv-fig .marco { fill: none; stroke: var(--cian); stroke-width: 2; stroke-dasharray: 5 4; opacity: 0; transition: opacity .35s; }
+  .tv-fig .marco.si { opacity: .9; }
+  /* la boca del esquema se abre cuando el estudiante le abre la boca al paciente */
+  .tv-fig .labios-cerrados, .tv-fig .labios-abiertos { transition: opacity .3s; }
+  .tv-fig .labios-abiertos { opacity: 0; fill: #050a12; stroke: var(--texto-3); stroke-width: 1.6; }
+  .tv-fig svg.boca .labios-cerrados { opacity: 0; }
+  .tv-fig svg.boca .labios-abiertos { opacity: 1; }
+  .tv-fig svg .lengua-fuera { opacity: 0; fill: var(--texto-3); transition: opacity .2s; }
+  .tv-fig svg.lengua .lengua-fuera { opacity: .75; }
+
+  /* ---- bloques de acción ---- */
+  .acciones { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .separador { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--texto-3); margin: 0 2px 10px; }
+  .separador.arriba { margin-top: auto; padding-top: 18px; }
+  .separador.luego { margin-top: 18px; }
+
+  .opcion {
+    display: flex; align-items: center; gap: 13px; width: 100%; min-height: 60px;
+    padding: 12px 15px; margin-bottom: 9px; border-radius: 16px; border: 1px solid var(--borde);
+    background: var(--tarjeta); color: inherit; font: inherit; text-align: left; cursor: pointer;
+    transition: transform .12s ease, border-color .2s, background .2s;
+  }
+  .opcion:active { transform: scale(.98); }
+  .opcion .zm { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; background: var(--tarjeta-2); display: grid; place-items: center; }
+  .opcion .zm svg { width: 19px; height: 19px; color: var(--texto-3); }
+  .opcion .tx { flex: 1; min-width: 0; }
+  .opcion .n { display: block; font-weight: 600; font-size: 16px; }
+  .opcion .d { display: block; font-size: 12.5px; color: var(--texto-3); margin-top: 2px; }
+  .opcion .vis { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; color: var(--texto-3); border: 1px solid var(--borde-2); border-radius: 999px; padding: 4px 7px; white-space: nowrap; }
+
+  /* mirar: el acercamiento que está en pantalla */
+  .mirar.activa { border-color: var(--cian); background: rgba(34,195,230,.12); }
+  .mirar.activa .n { color: var(--cian); }
+  .mirar.activa .zm { background: rgba(34,195,230,.16); }
+  .mirar.activa .zm svg { color: var(--cian); }
+  .mirar.activa .vis { color: var(--cian); border-color: rgba(34,195,230,.5); }
+
+  /* hacer: es un interruptor, no una navegación, y se ve distinto */
+  .hacer .zm svg { color: var(--texto-2); }
+  .hacer .llave { width: 48px; height: 28px; flex: 0 0 48px; border-radius: 999px; background: var(--tarjeta-2); border: 1px solid var(--borde-2); position: relative; transition: background .2s, border-color .2s; }
+  .hacer .llave::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--texto-3); transition: transform .2s, background .2s; }
+  .hacer.si { border-color: var(--ambar); background: rgba(245,165,36,.12); }
+  .hacer.si .n { color: var(--ambar); }
+  .hacer.si .zm { background: rgba(245,165,36,.16); }
+  .hacer.si .zm svg { color: var(--ambar); }
+  .hacer.si .llave { background: rgba(245,165,36,.3); border-color: var(--ambar); }
+  .hacer.si .llave::after { transform: translateX(20px); background: var(--ambar); }
+
+  .nota { color: var(--texto-3); font-size: 12.5px; line-height: 1.5; text-align: center; margin: 14px 6px 0; }
+
+  /* ---- avisos de estado ---- */
+  .aviso { margin: auto; text-align: center; padding: 0 10px; max-width: 420px; }
   .aviso h2 { font-size: 22px; margin: 0 0 10px; }
   .aviso p { color: var(--texto-2); font-size: 15px; line-height: 1.5; margin: 0 0 22px; }
   .boton { display: inline-block; padding: 15px 22px; border-radius: 14px; border: 1px solid var(--cian); background: rgba(34,195,230,.12); color: var(--cian); font: inherit; font-weight: 650; font-size: 16px; cursor: pointer; }
   .oculto { display: none !important; }
   .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translateX(-50%); background: #1b2a3e; border: 1px solid var(--borde-2); padding: 11px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; }
   .toast.si { opacity: 1; }
+
+  /* ---- celular bajito: el esquema estorba más de lo que ayuda ---- */
+  @media (min-height: 1000px) { .tv-fig svg { max-height: 430px; max-width: 340px; } }
+  @media (max-height: 900px) { .tv-fig svg { max-height: 240px; max-width: 200px; } }
+  @media (max-height: 700px) { .tv-fig { display: none; } }
+
+  /* ---- tablet: todo crece, nada se reacomoda ---- */
+  @media (min-width: 600px) {
+    body { max-width: 680px; padding-left: max(env(safe-area-inset-left), 28px); padding-right: max(env(safe-area-inset-right), 28px); }
+    .cabecera .caso { font-size: 32px; }
+    .cabecera .reloj { font-size: 22px; }
+    .tv-n { font-size: 24px; }
+    .tv-s { font-size: 15px; }
+    .opcion { min-height: 72px; padding: 14px 18px; border-radius: 18px; }
+    .opcion .n { font-size: 18px; }
+    .opcion .d { font-size: 14px; }
+    .opcion .zm { width: 40px; height: 40px; flex-basis: 40px; }
+    .opcion .zm svg { width: 22px; height: 22px; }
+    .separador { font-size: 12px; }
+  }
+
+  /* ---- tablet acostada: dos paneles, estado a un lado y botones al otro ---- */
+  @media (min-width: 900px) and (orientation: landscape) {
+    body { max-width: 1100px; }
+    .tablero { flex-direction: row; gap: 28px; align-items: stretch; }
+    .tv { flex: 1 1 0; min-width: 0; }
+    .acciones { flex: 1 1 0; min-width: 0; }
+    .tv-fig { display: grid; }
+    .tv-fig svg { max-height: none; max-width: 420px; }
+    .acciones { justify-content: center; }
+    .separador.arriba { margin-top: 0; padding-top: 0; }
+    .acciones .nota { margin-top: 22px; }
+  }
 </style>
 </head>
 <body>
@@ -59,44 +175,98 @@
     <span class="sync off" id="sync"><span class="p"></span><span id="syncTxt">CONECTANDO</span></span>
   </div>
 
-  <!-- Estado: otro celular tiene el control -->
+  <!-- Estado: otro aparato tiene el control -->
   <div class="aviso oculto" id="ocupado">
-    <h2>Otro celular tiene el control</h2>
-    <p>Solo un celular por grupo maneja el monitor, para que no se crucen las órdenes.</p>
+    <h2>Otro aparato tiene el control</h2>
+    <p>Solo uno por grupo maneja el televisor, para que no se crucen las órdenes.</p>
     <button class="boton" id="btnTomar">Tomar el control desde aquí</button>
   </div>
 
   <!-- Estado: el caso todavía no inicia -->
   <div class="aviso oculto" id="espera">
     <h2>Listo, estás conectado</h2>
-    <p>Cuando empiece el caso vas a ver aquí los sistemas del paciente. Al tocar uno, se amplía en el televisor.</p>
+    <p>Cuando empiece la sesión vas a poder elegir desde aquí qué se ve en el televisor y explorar al paciente. Los signos vitales y los hallazgos están allá, no acá.</p>
   </div>
 
   <!-- Estado: control activo -->
   <div class="oculto" id="panel">
-    <h1>Sistemas</h1>
-    <p class="ayuda">Toca para ampliar en el monitor</p>
-    <button class="fila general" id="btnGeneral">
-      <span class="ic" id="icGeneral"></span>
-      <span class="t"><div class="n">Vista general</div><div class="s">Paciente completo y signos vitales</div></span>
-      <span class="fl">›</span>
-    </button>
-    <div class="separador">POR SISTEMA</div>
-    <div id="lista"></div>
+    <div class="cabecera">
+      <div class="caso" id="caso">Paciente</div>
+      <div class="reloj" id="reloj">00:00</div>
+    </div>
+
+    <div class="tablero">
+      <section class="tv" id="tv">
+        <div class="tv-et"><span class="p"></span>EN EL TELEVISOR</div>
+        <div class="tv-n" id="tvNombre">—</div>
+        <div class="tv-s" id="tvSub"></div>
+        <div class="tv-fig" id="tvFig"></div>
+      </section>
+
+      <div class="acciones">
+        <div class="separador arriba">DÓNDE MIRAR</div>
+        <div id="lista"></div>
+        <div class="separador luego" id="sepHacer">QUÉ HACER</div>
+        <div id="maniobras"></div>
+        <p class="nota" id="nota"></p>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
 <script src="/static/comun.js"></script>
 <script>
-const { conectar, enviar, idDispositivo, ICONOS, escapar } = SimClin;
+const { conectar, enviar, idDispositivo, escapar, reloj } = SimClin;
 const $ = (id) => document.getElementById(id);
 const cid = idDispositivo();
 let soyControl = false;
 let ultimo = null;
-let pendiente;          // selección optimista mientras llega la confirmación (undefined = nada pendiente)
+let pendiente;          // selección optimista mientras llega la confirmación
 
-$("icGeneral").innerHTML = ICONOS.general;
+/* Dónde mira cada acercamiento. Dice el SITIO, nunca el hallazgo: que los
+ * labios estén cianóticos o las pupilas puntiformes lo tiene que ver el
+ * estudiante en la pantalla, no leerlo acá. */
+const DONDE = {
+  cara: "la cara y el cuello",
+  labios: "labios y mentón",
+  ojos: "los ojos de cerca",
+};
+/* Qué le hace cada maniobra al paciente. Tampoco adelanta nada: nombra la
+ * acción, no lo que se va a encontrar al hacerla. */
+const HACE = {
+  boca: "le abres la boca al paciente",
+  lengua: "le pides que saque la lengua",
+};
+const LUPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>';
+const MANO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.2V4.5a1.5 1.5 0 0 1 3 0v5.3m0-.6a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6v-2.5a1.5 1.5 0 0 1 3 0V14"/></svg>';
+
+/* Esquema de dónde está mirando el televisor. Es una silueta, no el modelo: no
+ * muestra ningún hallazgo, solo el sitio y si la boca está abierta. */
+const CARA = `
+<svg viewBox="0 0 120 152" aria-hidden="true">
+  <path class="silueta" d="M20 150c4-17 20-24 40-24s36 7 40 24"/>
+  <path class="silueta" d="M48 98v14c0 6-8 8-14 12M72 98v14c0 6 8 8 14 12"/>
+  <path class="silueta" d="M60 16c-22 0-34 18-34 42 0 25 15 44 34 44s34-19 34-44c0-24-12-42-34-42z"/>
+  <path class="silueta" d="M26 56c-4-1-7 2-6 7s5 8 8 7M94 56c4-1 7 2 6 7s-5 8-8 7"/>
+  <path class="rasgo" d="M60 58v12c0 2-2 3-4 3"/>
+  <ellipse class="rasgo" cx="46" cy="52" rx="7" ry="4.2"/>
+  <ellipse class="rasgo" cx="74" cy="52" rx="7" ry="4.2"/>
+  <path class="rasgo labios-cerrados" d="M48 84c4-3 20-3 24 0M48 84c4 4 20 4 24 0"/>
+  <ellipse class="labios-abiertos" cx="60" cy="85" rx="11" ry="7.5"/>
+  <path class="lengua-fuera" d="M53 85c0-3 3-5 7-5s7 2 7 5v3c0 3-3 5-7 5s-7-2-7-5z"/>
+  <path class="zona" data-z="cara" d="M60 16c-22 0-34 18-34 42 0 25 15 44 34 44s34-19 34-44c0-24-12-42-34-42z"/>
+  <g class="zona" data-z="ojos"><ellipse cx="46" cy="52" rx="11" ry="8"/><ellipse cx="74" cy="52" rx="11" ry="8"/></g>
+  <ellipse class="zona" data-z="labios" cx="60" cy="84" rx="18" ry="11"/>
+  <rect class="marco" data-z="cara" x="22" y="12" width="76" height="94" rx="12"/>
+  <rect class="marco" data-z="ojos" x="31" y="40" width="58" height="25" rx="9"/>
+  <rect class="marco" data-z="labios" x="38" y="71" width="44" height="26" rx="9"/>
+</svg>`;
+
+/* Lo que el estudiante ya le mostró al salón en esta sesión. Sirve para que
+ * explore ordenado; se reinicia con cada caso nuevo. */
+let sesion = null;
+const mostrados = new Set();
 
 function aviso(txt) {
   const t = $("toast");
@@ -121,24 +291,54 @@ async function seleccionar(sistema, subvista) {
   const r = await enviar("/api/control/seleccionar", { cid, sistema, subvista }).catch(() => null);
   if (!r || r.error) {
     pendiente = undefined;
-    aviso(r && r.error ? "Otro celular tomó el control" : "Sin conexión con el monitor");
+    aviso(r && r.error ? "Otro aparato tomó el control" : "Sin conexión con el televisor");
+    await tomar(false);
+  }
+}
+
+async function maniobra(nombre, valor) {
+  if (navigator.vibrate) navigator.vibrate(valor ? [12, 40, 12] : 12);
+  const r = await enviar("/api/control/maniobra", { cid, nombre, valor }).catch(() => null);
+  if (!r || r.error) {
+    aviso(r && r.error ? "Otro aparato tomó el control" : "Sin conexión con el televisor");
     await tomar(false);
   }
 }
 
 $("btnTomar").onclick = () => tomar(true);
-$("btnGeneral").onclick = () => seleccionar(null);
 
-function subtitulo(s, mostrarConteos) {
-  if (!mostrarConteos) return { txt: `${s.hallazgos.length} parámetros`, cls: "" };
-  if (s.criticos) return { txt: `${s.criticos} crítico${s.criticos > 1 ? "s" : ""}`, cls: "crit" };
-  if (s.alertas) return { txt: `${s.alertas} en alerta`, cls: "warn" };
-  return { txt: `${s.hallazgos.length} parámetros`, cls: "" };
+/* La tarjeta de arriba es la única confirmación que necesita el estudiante:
+ * dice con todas las letras qué está proyectado en este momento. */
+let ultimoCartel = "";
+function pintarTelevisor(e) {
+  const sis = e.sistemas.find((s) => s.id === e.sistema_seleccionado);
+  const sv = sis && (sis.subvistas || []).find((v) => v.id === e.subvista);
+  const nombre = sis ? sis.nombre : "Paciente";
+  const detalle = sv ? `Acercamiento: ${sv.nombre.toLowerCase()}` : "Sistema ampliado";
+  const cartel = nombre + "|" + detalle;
+  $("tvNombre").textContent = nombre;
+  $("tvSub").textContent = detalle;
+  if (ultimoCartel && cartel !== ultimoCartel) {
+    const t = $("tv");
+    t.classList.add("destello");
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove("destello"), 650);
+  }
+  ultimoCartel = cartel;
+
+  const fig = $("tvFig");
+  if (!fig._puesto) { fig._puesto = true; fig.innerHTML = CARA; }
+  const z = e.subvista || "cara";
+  fig.querySelectorAll("[data-z]").forEach((n) => n.classList.toggle("si", n.dataset.z === z));
+  const svg = fig.querySelector("svg");
+  if (svg) {
+    svg.classList.toggle("boca", !!(e.maniobras && e.maniobras.boca));
+    svg.classList.toggle("lengua", !!(e.maniobras && e.maniobras.lengua));
+  }
 }
 
 function render(e) {
   ultimo = e;
-  // si el servidor dice que el controlador es otro (o nadie), ajustar
   if (e.controlador && e.controlador !== cid) soyControl = false;
   if (!e.controlador && !soyControl) { tomar(false); }
   if (e.controlador === cid) soyControl = true;
@@ -149,34 +349,77 @@ function render(e) {
   $("panel").classList.toggle("oculto", !soyControl || !e.iniciado);
   if (!soyControl || !e.iniciado) return;
 
+  // Sesión nueva: se olvida lo que ya se había mostrado.
+  if (e.sesion_id !== sesion) { sesion = e.sesion_id; mostrados.clear(); }
+  if (e.sistema_seleccionado && e.subvista) mostrados.add(e.sistema_seleccionado + "/" + e.subvista);
+
+  $("caso").textContent = "Paciente";
+  $("reloj").textContent = reloj(e.transcurrido_s);
+  $("reloj").classList.toggle("pausa", !e.corriendo);
+  pintarTelevisor(e);
+
   const actual = pendiente !== undefined ? pendiente : e.sistema_seleccionado;
   if (pendiente !== undefined && e.sistema_seleccionado === pendiente) pendiente = undefined;
 
-  $("btnGeneral").classList.toggle("activa", !actual);
-  // En este prototipo solo la cabeza está modelada: el resto ni siquiera se lista,
-  // para que nadie entre a un sistema que no existe. Se vuelve a prender desde el panel.
+  // ---- dónde mirar ----
   const visibles = e.sistemas.filter((s) => s.disponible !== false);
+  const unico = visibles.length === 1;
   const html = visibles.map((s) => {
-    const sub = subtitulo(s, e.mostrar_conteos);
     const activo = actual === s.id;
-    // Si solo queda un sistema, las subvistas se muestran siempre: así la cara,
-    // los labios y los ojos quedan a un toque y no a dos.
-    const chips = (activo || visibles.length === 1) && s.subvistas && s.subvistas.length
-      ? `<div class="subvistas">${s.subvistas.map((v) => `<button class="sub ${e.subvista === v.id ? "activa" : ""}" data-sis="${s.id}" data-sub="${v.id}">${escapar(v.nombre)}</button>`).join("")}</div>`
+    const abierto = (activo || unico) && s.subvistas && s.subvistas.length;
+    const zooms = abierto
+      ? s.subvistas.map((v) => {
+          const esta = activo && e.subvista === v.id;
+          const ya = mostrados.has(s.id + "/" + v.id);
+          const marca = esta ? "EN PANTALLA" : (ya ? "MOSTRADA" : "");
+          return `<button class="opcion mirar ${esta ? "activa" : ""}" data-sis="${s.id}" data-sub="${v.id}">
+            <span class="zm">${LUPA}</span>
+            <span class="tx"><span class="n">${escapar(v.nombre)}</span><span class="d">${escapar(DONDE[v.id] || "acercamiento")}</span></span>
+            ${marca ? `<span class="vis">${marca}</span>` : ""}
+          </button>`;
+        }).join("")
       : "";
-    return `<button class="fila ${activo ? "activa" : ""}" data-id="${s.id}">
-      <span class="ic">${ICONOS[s.icono] || ""}</span>
-      <span class="t"><div class="n">${escapar(s.nombre)}</div><div class="s ${sub.cls}">${sub.txt}</div></span>
-      ${activo ? '<span class="en-monitor">EN MONITOR</span>' : '<span class="fl">›</span>'}
-    </button>${chips}`;
+    // Con un solo sistema su tarjeta no agrega nada: los acercamientos ya
+    // están abajo y lo que se proyecta se lee arriba.
+    const tarjeta = unico ? "" : `<button class="opcion mirar ${activo ? "activa" : ""}" data-id="${s.id}">
+      <span class="zm">${LUPA}</span>
+      <span class="tx"><span class="n">${escapar(s.nombre)}</span><span class="d">sistema completo</span></span>
+    </button>`;
+    return tarjeta + zooms;
   }).join("");
-  // Solo se redibuja si algo cambió: redibujar en cada mensaje "se come" los toques en el celular
+
   if (html !== $("lista")._html) {
     $("lista")._html = html;
     $("lista").innerHTML = html;
-    $("lista").querySelectorAll(".fila").forEach((b) => (b.onclick = () => seleccionar(b.dataset.id)));
-    $("lista").querySelectorAll(".sub").forEach((b) => (b.onclick = () => seleccionar(b.dataset.sis, b.dataset.sub)));
+    $("lista").querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => seleccionar(b.dataset.id)));
+    $("lista").querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => seleccionar(b.dataset.sis, b.dataset.sub)));
   }
+
+  // ---- qué hacer ----
+  const disp = e.maniobras_disponibles || [];
+  $("sepHacer").classList.toggle("oculto", !disp.length);
+  const hm = disp.map((m) => {
+    const si = !!(e.maniobras && e.maniobras[m.id]);
+    return `<button class="opcion hacer ${si ? "si" : ""}" data-man="${m.id}" data-val="${si ? "0" : "1"}" aria-pressed="${si}">
+      <span class="zm">${MANO}</span>
+      <span class="tx"><span class="n">${escapar(m.nombre)}</span><span class="d">${escapar(HACE[m.id] || "maniobra")}</span></span>
+      <span class="llave"></span>
+    </button>`;
+  }).join("");
+  if (hm !== $("maniobras")._html) {
+    $("maniobras")._html = hm;
+    $("maniobras").innerHTML = hm;
+    $("maniobras").querySelectorAll("[data-man]").forEach((b) => {
+      b.onclick = () => maniobra(b.dataset.man, b.dataset.val === "1");
+    });
+  }
+
+  const restantes = visibles.reduce((n, s) => n + (s.subvistas || []).filter((v) => !mostrados.has(s.id + "/" + v.id)).length, 0);
+  $("nota").textContent = unico
+    ? (restantes
+        ? `Solo la cabeza tiene modelo 3D por ahora. ${restantes > 1 ? `Te faltan ${restantes} acercamientos.` : "Te falta 1 acercamiento."}`
+        : "Solo la cabeza tiene modelo 3D por ahora. Ya mostraste los tres acercamientos.")
+    : "";
 }
 
 conectar("control", cid, render, (ok) => {
