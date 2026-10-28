@@ -16,7 +16,8 @@
 
   Tiene dos ejes, y por eso son dos bloques:
     DÓNDE MIRAR   acercar el televisor a una zona. No cambia al paciente.
-    QUÉ HACER     maniobras de exploración sobre el paciente (abrirle la boca).
+    QUÉ HACER     maniobras de exploración sobre el paciente (abrirle la boca,
+                  pedirle que saque la lengua).
                   Las hace el estudiante, no el profesor, y quedan registradas.
 
   Nada de lo que dice esta pantalla adelanta un hallazgo. Los botones dicen el
@@ -82,6 +83,8 @@
   .tv-fig .labios-abiertos { opacity: 0; fill: #050a12; stroke: var(--texto-3); stroke-width: 1.6; }
   .tv-fig svg.boca .labios-cerrados { opacity: 0; }
   .tv-fig svg.boca .labios-abiertos { opacity: 1; }
+  .tv-fig svg .lengua-fuera { opacity: 0; fill: var(--texto-3); transition: opacity .2s; }
+  .tv-fig svg.lengua .lengua-fuera { opacity: .75; }
 
   /* ---- bloques de acción ---- */
   .acciones { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -182,13 +185,13 @@
   <!-- Estado: el caso todavía no inicia -->
   <div class="aviso oculto" id="espera">
     <h2>Listo, estás conectado</h2>
-    <p>Cuando empiece el caso vas a poder elegir desde aquí qué se ve en el televisor y explorar al paciente. Los signos vitales y los hallazgos están allá, no acá.</p>
+    <p>Cuando empiece la sesión vas a poder elegir desde aquí qué se ve en el televisor y explorar al paciente. Los signos vitales y los hallazgos están allá, no acá.</p>
   </div>
 
   <!-- Estado: control activo -->
   <div class="oculto" id="panel">
     <div class="cabecera">
-      <div class="caso" id="caso">Caso</div>
+      <div class="caso" id="caso">Paciente</div>
       <div class="reloj" id="reloj">00:00</div>
     </div>
 
@@ -251,6 +254,7 @@ const CARA = `
   <ellipse class="rasgo" cx="74" cy="52" rx="7" ry="4.2"/>
   <path class="rasgo labios-cerrados" d="M48 84c4-3 20-3 24 0M48 84c4 4 20 4 24 0"/>
   <ellipse class="labios-abiertos" cx="60" cy="85" rx="11" ry="7.5"/>
+  <path class="lengua-fuera" d="M53 85c0-3 3-5 7-5s7 2 7 5v3c0 3-3 5-7 5s-7-2-7-5z"/>
   <path class="zona" data-z="cara" d="M60 16c-22 0-34 18-34 42 0 25 15 44 34 44s34-19 34-44c0-24-12-42-34-42z"/>
   <g class="zona" data-z="ojos"><ellipse cx="46" cy="52" rx="11" ry="8"/><ellipse cx="74" cy="52" rx="11" ry="8"/></g>
   <ellipse class="zona" data-z="labios" cx="60" cy="84" rx="18" ry="11"/>
@@ -327,7 +331,10 @@ function pintarTelevisor(e) {
   const z = e.subvista || "cara";
   fig.querySelectorAll("[data-z]").forEach((n) => n.classList.toggle("si", n.dataset.z === z));
   const svg = fig.querySelector("svg");
-  if (svg) svg.classList.toggle("boca", !!(e.maniobras && e.maniobras.boca));
+  if (svg) {
+    svg.classList.toggle("boca", !!(e.maniobras && e.maniobras.boca));
+    svg.classList.toggle("lengua", !!(e.maniobras && e.maniobras.lengua));
+  }
 }
 
 function render(e) {
@@ -342,11 +349,11 @@ function render(e) {
   $("panel").classList.toggle("oculto", !soyControl || !e.iniciado);
   if (!soyControl || !e.iniciado) return;
 
-  // Caso nuevo: se olvida lo que ya se había mostrado.
+  // Sesión nueva: se olvida lo que ya se había mostrado.
   if (e.sesion_id !== sesion) { sesion = e.sesion_id; mostrados.clear(); }
   if (e.sistema_seleccionado && e.subvista) mostrados.add(e.sistema_seleccionado + "/" + e.subvista);
 
-  $("caso").textContent = e.codigo || "Caso";
+  $("caso").textContent = "Paciente";
   $("reloj").textContent = reloj(e.transcurrido_s);
   $("reloj").classList.toggle("pausa", !e.corriendo);
   pintarTelevisor(e);

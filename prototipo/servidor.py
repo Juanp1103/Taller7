@@ -108,12 +108,7 @@ def limitar_signo(nombre, valor):
 # la lengua con la boca cerrada.
 MANIOBRAS = {
     "boca":   {"nombre": "Abrir la boca", "exige": None, "disponible": True},
-    # La lengua está lista en el servidor y en el control, pero apagada: el
-    # modelo que entregó el diseñador tiene la lengua colgada por debajo del
-    # arco dental y con el rig compartido, así que no se puede sacar sin
-    # romper la boca (ver el comentario en static/visor3d.js). El día que
-    # llegue bien, se pone disponible en True y queda andando.
-    "lengua": {"nombre": "Sacar la lengua", "exige": "boca", "disponible": False},
+    "lengua": {"nombre": "Sacar la lengua", "exige": "boca", "disponible": True},
 }
 
 

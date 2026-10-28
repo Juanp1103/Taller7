@@ -24,6 +24,8 @@
  *   - La apertura de la boca: el morph abre los labios y, a la vez, se rota el
  *     hueso de la mandíbula, porque la dentadura es un objeto aparte y con el
  *     morph solo se vería una boca abierta con los dientes apretados.
+ *   - Sacar la lengua: se gira y se adelanta el hueso de la raíz de la lengua,
+ *     que arrastra la cadena entera.
  *
  * Todas las medidas de abajo están tomadas sobre ESTE modelo, en coordenadas
  * de mundo, con la cara mirando hacia +Z. Si llega un modelo nuevo hay que
@@ -57,16 +59,25 @@ const HUECO_Y = 0.45;
 // Cuánto baja la mandíbula con la boca abierta.
 const GRADOS_MANDIBULA = 26;
 
-/* SACAR LA LENGUA no se puede con este modelo, y no es por falta de intentarlo:
- *   - Mover la malla no hace nada: una malla con esqueleto en modo "attached"
- *     recalcula su matriz de enlace cada cuadro y cancela el movimiento.
- *     Pasarla a "detached" la descoloca y la encoge, porque el conjunto de la
- *     boca viene escalado.
- *   - Rotar los huesos de la lengua arrastra el arco dental de arriba, que
- *     comparte pesos con ellos, y tapa la boca entera.
- * La causa está en el archivo: la lengua es una placa colgada por debajo del
- * arco, fuera de la cavidad, con el rig compartido. Cuando el diseñador la
- * ponga dentro de la boca se prende la maniobra en el servidor y ya. */
+/* SACAR LA LENGUA: se mueve el PRIMER HUESO de la cadena de la lengua, el de
+ * la raíz, y los otros siete lo siguen. Dos cosas a la vez, porque con una
+ * sola no se ve: se gira hacia arriba para que la lengua suba del piso de la
+ * boca, y se adelanta a lo largo de la cadena para que la punta llegue a los
+ * labios. Girar sin adelantar la enrosca hacia atrás y la punta termina
+ * saliendo por el mentón.
+ *
+ * Lo que NO hay que tocar es la malla: una malla con esqueleto en modo
+ * "attached" recalcula su matriz de enlace cada cuadro y cancela cualquier
+ * movimiento del nodo; pasarla a "detached" la descoloca y la encoge, porque
+ * el conjunto de la boca viene escalado. Los huesos sí se pueden mover, y los
+ * pesos están limpios: la malla de la lengua está 100 % en los ocho huesos
+ * "Tongue", y los dos arcos dentales están 100 % en los suyos, así que mover
+ * la lengua no arrastra los dientes.
+ *
+ * Medido sobre este modelo: el avance va en el eje local Y del hueso, que es
+ * el que corre de la raíz a la punta. */
+const GRADOS_LENGUA = -25;
+const AVANCE_LENGUA = 0.030;
 
 /* Cada vista dice QUÉ zona hay que ver, no dónde poner la cámara: la
  * distancia se calcula con la forma que tenga el panel en ese momento. Así el
@@ -287,9 +298,12 @@ function prepararModelo(raiz) {
   const mandibula = raiz.getObjectByName("Human_-_Lower_Jaw_1")
                  || raiz.getObjectByName("Human - Lower Jaw");
   const mandibulaBase = mandibula ? mandibula.rotation.x : 0;
+  // El hueso de la RAÍZ de la lengua. Arrastra a los otros siete.
   const lengua = raiz.getObjectByName("Human_-_Tongue000")
               || raiz.getObjectByName("Human - Tongue.000");
-  const lenguaBase = lengua ? lengua.rotation.x : 0;
+  const lenguaBase = lengua
+    ? { giro: lengua.rotation.x, avance: lengua.position.y }
+    : null;
   const gotas = cabeza ? crearGotas(raiz, cabeza) : [];
 
   return {
@@ -326,6 +340,7 @@ export function crearVisor(contenedor) {
   let cargado = false;
   let mmObjetivo = 4, mmActual = 4;
   let bocaObjetivo = 0, bocaActual = 0;
+  let lenguaObjetivo = 0, lenguaActual = 0;
 
   function aplicarPupila(mm) {
     if (!modelo) return;
@@ -346,12 +361,22 @@ export function crearVisor(contenedor) {
     luzBoca.intensity = k * 0.004;
   }
 
+  /* Sacar la lengua: giro y avance del hueso de la raíz, los dos a la vez.
+   * Ver el porqué arriba, junto a las constantes. */
+  function aplicarLengua(v) {
+    if (!modelo || !modelo.lengua) return;
+    const k = Math.min(Math.max(v, 0), 1);
+    modelo.lengua.rotation.x = modelo.lenguaBase.giro + (k * GRADOS_LENGUA * Math.PI) / 180;
+    modelo.lengua.position.y = modelo.lenguaBase.avance + k * AVANCE_LENGUA;
+  }
+
   cargarModelo().then(
     (m) => {
       modelo = m;
       escena.add(m.raiz);
       aplicarPupila(mmActual);
       aplicarBoca(bocaActual);
+      aplicarLengua(lenguaActual);
       cargado = true;
       contenedor.dataset.estado = "listo";
       ajustarTamano();
@@ -432,6 +457,7 @@ export function crearVisor(contenedor) {
     mmObjetivo = visual.pupila_mm || 4;
     // Las maniobras las hace el estudiante desde el control, no el escenario.
     bocaObjetivo = maniobras && maniobras.boca ? 1 : 0;
+    lenguaObjetivo = maniobras && maniobras.lengua ? 1 : 0;
     const sudor = visual.sudor || 0;
     if (modelo && modelo.materialPiel) modelo.materialPiel.roughness = 1 - sudor * 0.55;
     if (modelo) for (const g of modelo.gotas) g.material.opacity = sudor * 0.45;
@@ -477,6 +503,12 @@ export function crearVisor(contenedor) {
     if (Math.abs(bocaObjetivo - bocaActual) > 0.002) {
       bocaActual = acercar(bocaActual, bocaObjetivo, 0.30, dt);
       aplicarBoca(bocaActual);
+      repintar();
+    }
+    // La lengua va un poco más lenta que la boca: primero se abre, después sale.
+    if (Math.abs(lenguaObjetivo - lenguaActual) > 0.002) {
+      lenguaActual = acercar(lenguaActual, lenguaObjetivo, 0.40, dt);
+      aplicarLengua(lenguaActual);
       repintar();
     }
     // Las gotas resbalan despacio y vuelven a empezar.

@@ -89,12 +89,7 @@ const E = {
 // la lengua con la boca cerrada.
 const MANIOBRAS = {
   boca:   { nombre: "Abrir la boca", exige: null, disponible: true },
-  // La lengua está lista en el servidor y en el control, pero apagada: el
-  // modelo que entregó el diseñador tiene la lengua colgada por debajo del
-  // arco dental y con el rig compartido, así que no se puede sacar sin romper
-  // la boca (ver el comentario en static/visor3d.js). El día que llegue bien,
-  // se pone disponible en true y queda andando.
-  lengua: { nombre: "Sacar la lengua", exige: "boca", disponible: false },
+  lengua: { nombre: "Sacar la lengua", exige: "boca", disponible: true },
 };
 
 function nuevaSesion() {
