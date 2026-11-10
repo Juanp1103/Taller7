@@ -39,6 +39,10 @@
   .chip .p { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
   .chip.real { color: var(--ok); border-color: rgba(34,197,94,.45); background: rgba(34,197,94,.08); }
   .chip.demo { color: var(--warn); border-color: rgba(245,165,36,.4); background: rgba(245,165,36,.07); }
+  .bt-sonido { background: transparent; cursor: pointer; font: inherit; font-family: var(--mono); font-size: 15px; letter-spacing: .08em; }
+  .bt-sonido .p { opacity: .35; }
+  .bt-sonido.on { color: var(--ecg); border-color: rgba(43,212,107,.45); background: rgba(43,212,107,.08); }
+  .bt-sonido.on .p { opacity: 1; }
   .tiempo { font-family: var(--mono); font-size: 24px; color: var(--texto-2); min-width: 120px; text-align: right; }
   .estado { font-family: var(--mono); font-size: 17px; letter-spacing: .14em; font-weight: 700; padding: 11px 20px; border-radius: 999px; border: 1px solid; display: inline-flex; gap: 10px; align-items: center; }
   .estado .p { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
@@ -172,6 +176,7 @@
       <div class="sub" id="subtitulo">Paciente · —</div>
     </div>
     <div class="der">
+      <button class="chip bt-sonido oculto" id="btSonido" type="button" title="Enciende o apaga el pitido del monitor (tecla S)"><span class="p"></span><span id="sonidoTxt">SONIDO</span></button>
       <span class="chip demo" id="fuente"><span class="p"></span><span id="fuenteTxt">MODO DEMO</span></span>
       <span class="tiempo" id="tiempo">T+ 00:00</span>
       <span class="estado espera" id="estado"><span class="p"></span><span id="estadoTxt">EN ESPERA</span></span>
@@ -473,6 +478,9 @@ function render(e) {
   $("estadoTxt").textContent = e.estado_paciente;
 
   // El distintivo de la fuente solo tiene sentido si hay vitales que calificar.
+  // El botón del sonido solo tiene sentido si hay algo que pitar.
+  $("btSonido").classList.toggle("oculto", !hayVitales);
+  if (hayVitales && Object.values(e.vitales).some((v) => v.severidad === "crit")) Sonido.alarma();
   $("fuente").className = "chip " + (e.datos_reales ? "real" : "demo") + (hayVitales ? "" : " oculto");
   $("fuenteTxt").textContent = e.datos_reales
     ? "DATOS REALES DEL SIMULADOR"
@@ -569,9 +577,91 @@ function renderPines(e) {
   $("pines").innerHTML = html;
 }
 
+/* ---------- sonido del monitor ----------
+ * El pitido del latido y la alarma se SINTETIZAN aquí: no hay archivos de
+ * audio que cargar, así que esto funciona igual con el salón sin internet.
+ *
+ * Dos cosas, como en un monitor de verdad:
+ *   - un pip por latido, que suena en la onda R del trazo, no en cualquier
+ *     momento; y cuyo TONO BAJA con la saturación, que es como suena un
+ *     pulsioxímetro y es en sí mismo un hallazgo clínico;
+ *   - una alarma de tres pitos cuando algún valor está en crítico, cada diez
+ *     segundos y no seguido, que si no es insoportable en una clase.
+ *
+ * El navegador no deja sonar nada hasta que alguien toca la página, así que
+ * el botón de la cabecera hace las dos cosas a la vez: desbloquea el audio y
+ * enciende el sonido. Arranca apagado a propósito. */
+const Sonido = (() => {
+  let ctx = null, encendido = false, ultimaAlarma = 0;
+
+  function asegurarContexto() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+    }
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+
+  function tono(frecuencia, duracion, volumen, tipo) {
+    const c = ctx; if (!c) return;
+    const t = c.currentTime;
+    const osc = c.createOscillator(), gan = c.createGain();
+    osc.type = tipo || "sine";
+    osc.frequency.setValueAtTime(frecuencia, t);
+    gan.gain.setValueAtTime(0, t);
+    gan.gain.linearRampToValueAtTime(volumen, t + 0.006);
+    gan.gain.exponentialRampToValueAtTime(0.0001, t + duracion);
+    osc.connect(gan); gan.connect(c.destination);
+    osc.start(t); osc.stop(t + duracion + 0.02);
+  }
+
+  /* El tono del pulsioxímetro baja con la saturación: 100 % suena agudo y
+   * cada punto que baja lo oscurece. A 84 % se oye claramente más grave. */
+  function latido(spo2) {
+    if (!encendido || !ctx) return;
+    const sat = Math.min(100, Math.max(60, Number(spo2) || 98));
+    tono(880 * Math.pow(2, -(100 - sat) / 24), 0.09, 0.14);
+  }
+
+  function alarma() {
+    if (!encendido || !ctx) return;
+    const ahora = performance.now();
+    if (ahora - ultimaAlarma < 10000) return;      // una cada diez segundos
+    ultimaAlarma = ahora;
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => tono(1180, 0.11, 0.13, "square"), i * 150);
+    }
+  }
+
+  function alternar() {
+    asegurarContexto();
+    encendido = !encendido && !!ctx;
+    pintarBoton();
+    if (encendido) tono(660, 0.07, 0.09);          // confirma que sí se oye
+  }
+
+  function pintarBoton() {
+    const b = $("btSonido");
+    if (!b) return;
+    b.classList.toggle("on", encendido);
+    $("sonidoTxt").textContent = encendido ? "SONIDO: SÍ" : "SONIDO: NO";
+  }
+
+  return { latido, alarma, alternar, pintarBoton, activo: () => encendido };
+})();
+
+$("btSonido").onclick = () => Sonido.alternar();
+addEventListener("keydown", (ev) => {
+  if ((ev.key === "s" || ev.key === "S") && !ev.metaKey && !ev.ctrlKey && !ev.altKey) Sonido.alternar();
+});
+Sonido.pintarBoton();
+
 /* ---------- trazo de ECG (barrido tipo monitor) ---------- */
 (function ecg() {
   const cv = $("ecg"), ctx = cv.getContext("2d");
+  const R_ONDA = 0.215;   // dónde cae el pico R dentro del latido, en segundos
   let W = 0, H = 0, x = 0, yPrev = null, tBeat = 0, last = performance.now();
   function tam() {
     const r = cv.getBoundingClientRect(), s = r.width / cv.offsetWidth || 1;
@@ -584,15 +674,27 @@ function renderPines(e) {
     return g(0.10, 0.025, 0.12) - g(0.195, 0.008, 0.12) + g(0.215, 0.011, 1.0) - g(0.24, 0.01, 0.28) + g(0.44, 0.045, 0.25);
   }
   function paso(ahora) {
-    const dt = Math.min(0.05, (ahora - last) / 1000); last = ahora;
+    /* El tope del salto era de 0,05 s, o sea que por debajo de 20 cuadros por
+     * segundo el corazón latía en cámara lenta: en un portátil flojo el trazo
+     * y el pitido iban a un tercio de la frecuencia que decía el número. Ahora
+     * el tope es de un cuarto de segundo (solo para cuando la pestaña estuvo
+     * dormida) y los sub-pasos se parten lo que haga falta para que ninguno
+     * pase de 10 ms, que es lo que garantiza no saltarse una onda R. */
+    const dt = Math.min(0.25, (ahora - last) / 1000); last = ahora;
     const activo = estado && estado.iniciado;
     const fc = (activo && estado.vitales && estado.vitales.fc) ? Math.max(20, estado.vitales.fc.valor) : 0;
     const periodo = fc ? 60 / fc : 1e9;
     const vel = W / 5.2; // la pantalla muestra ~5 s de trazo
-    const pasos = 4;
+    const pasos = Math.max(4, Math.ceil(dt / 0.01));
     for (let i = 0; i < pasos; i++) {
+      const antes = tBeat;
       tBeat += dt / pasos;
       if (tBeat > periodo) tBeat -= periodo;
+      // el pip suena cuando el trazo pasa por la onda R, no en cualquier parte
+      if (fc && tBeat >= R_ONDA && (antes < R_ONDA || tBeat < antes)) {
+        const sat = (estado.vitales && estado.vitales.spo2) ? estado.vitales.spo2.valor : 98;
+        Sonido.latido(sat);
+      }
       const nx = x + (vel * dt) / pasos;
       const y = H * 0.62 - (activo ? onda(tBeat) : 0) * H * 0.45;
       ctx.fillStyle = "#050b12"; ctx.fillRect(nx, 0, 26, H);
