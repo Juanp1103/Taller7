@@ -1,0 +1,9 @@
+Arreglo del modelo que entrega MB-Lab. Ver ../MODELO.md para el porqué.
+
+  npm install @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions
+  node arreglar.js  <lo_que_mando_el_disenador.glb>  arreglado.glb
+  gltf-transform resize arreglado.glb paso1.glb --width 1024 --height 1024
+  gltf-transform webp   paso1.glb     ../static/modelo.glb
+
+pestana_alfa_invertida.png es la textura de las pestanas con el canal alfa
+corregido; el script la mete al archivo.

@@ -1,35 +1,42 @@
 /* SimClin — visor 3D del paciente
  * ------------------------------------------------------------------
- * Modelo: static/modelo.glb, el busto que entregó el diseñador (cabeza, cuello
- * y hombros), con los dos ojos montados en las órbitas, los párpados abiertos
- * y la boca completa por dentro: mandíbula, dentadura, faringe y LENGUA.
+ * Modelo: static/modelo.glb, el personaje que armó el diseñador con MB-Lab.
+ * Es un cuerpo completo a escala real (1,73 m) y EN METROS, así que todas las
+ * medidas de abajo están en metros y la cara está allá arriba, cerca de y=1,6.
+ * El visor solo encuadra la cabeza; el resto del cuerpo nunca entra en cuadro.
  *
- * Nodos que importan:
- *   "Eye" y "Eye001"        los dos ojos, cada uno con su material de iris
- *   "grp_blendShapes_01"    la cabeza, con el morph "jawOpen"
- *   "Human_-_Denture"       la boca por dentro, con su esqueleto de huesos
+ * El archivo que usamos NO es el que entrega MB-Lab tal cual: se le conectaron
+ * las texturas (salían sin nada), se le dejaron solo seis morphs de los 82 que
+ * traía, y se comprimió de 28,9 MB a 2,6 MB. Si llega una reexportación nueva
+ * hay que repetir ese arreglo, está descrito en MODELO.md.
+ *
+ * Partes del modelo que importan, identificadas por el NOMBRE DEL MATERIAL:
+ *   Character_MBLab_skin3        la piel: cuerpo, cara y el interior de la boca
+ *   Character_MBLab_tongue       la lengua
+ *   Character_MBLab_Iris_V4      el iris de los dos ojos
+ *   Character_MBlab_pupil        la pupila del modelo (se esconde: ver abajo)
+ *   Character_MBlab_human_eyes   la esclerótica
+ *   Character_MBlab_cornea       la córnea, transparente
+ *
+ * Y los morphs que usamos:
+ *   Expressions_mouthOpen_max    abrir la boca
+ *   Expressions_tongueOut_max    sacar la lengua
  *
  * Lo que pone la app encima del modelo:
  *   - Cianosis alrededor de la boca y color de piel (pálida o rubicunda) en
- *     toda la cara, con un shader
- *     que respeta la textura y el mapa de normales de la escultura.
+ *     toda la cara, con un shader que respeta la textura de la escultura.
  *   - Cianosis CENTRAL en la lengua, que es donde se valora de verdad. Por eso
  *     la lengua se tiñe más y sin depender de la distancia a la boca.
  *   - Sudoración: la piel se vuelve brillante y aparecen gotas pegadas a la
  *     frente y las mejillas, colocadas lanzando rayos contra la malla.
- *   - La PUPILA, que no viene en el modelo y así debe ser: su diámetro sale
- *     del valor en milímetros del escenario, no de escalar una malla a ojo.
- *   - Una ventana en la córnea para que se vea el iris (el globo y la córnea
- *     son una sola malla cerrada; sin esto la córnea tapa el iris).
- *   - La apertura de la boca: el morph abre los labios y, a la vez, se rota el
- *     hueso de la mandíbula, porque la dentadura es un objeto aparte y con el
- *     morph solo se vería una boca abierta con los dientes apretados.
- *   - Sacar la lengua: se gira y se adelanta el hueso de la raíz de la lengua,
- *     que arrastra la cadena entera.
+ *   - La PUPILA, en milímetros reales. El modelo trae su propia pupila con un
+ *     morph de dilatación, pero ese morph solo va de 3,3 a 5,7 mm y nosotros
+ *     necesitamos desde 0,8 (puntiforme) hasta 9. Así que la pupila del modelo
+ *     se esconde y dibujamos la nuestra encima del iris, del diámetro exacto.
  *
  * Todas las medidas de abajo están tomadas sobre ESTE modelo, en coordenadas
- * de mundo, con la cara mirando hacia +Z. Si llega un modelo nuevo hay que
- * volver a medirlas.
+ * de mundo y en METROS, con la cara mirando hacia +Z. Si llega un modelo nuevo
+ * hay que volver a medirlas.
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -38,61 +45,39 @@ const PALIDEZ = new THREE.Color(0xd9cec7);
 const RUBICUNDEZ = new THREE.Color(0xc9654a);
 const CIANOSIS = new THREE.Color(0x5f5a8a);
 const CIANOSIS_LENGUA = new THREE.Color(0x6b5f93);
-const COLOR_IRIS = new THREE.Color(0x6b4a2f);
-const COLOR_ESCLERA = new THREE.Color(0xf2efe9);
 
 // Centro de la boca y radio de la zona que se tiñe de cianosis. Los labios son
 // una elipse ancha y baja, así que la máscara aplasta el eje X: con una esfera
-// el morado se subía al bigote y bajaba a la barbilla.
-const BOCA = new THREE.Vector3(0, -0.034, 0.051);
-const RADIO_BOCA = 0.018;
+// el morado se subía al bigote y bajaba a la barbilla. El radio quedó apretado
+// a propósito: con uno más grande los dientes también salían morados.
+const BOCA = new THREE.Vector3(0, 1.5515, 0.1575);
+const RADIO_BOCA = 0.0140;
 const ACHATADO_BOCA = 0.5;
 
-// Del ojo: el iris mira a +Y DENTRO del nodo (el nodo trae su propia rotación
-// de 90°). El tamaño en milímetros de una unidad local se saca de la escala
-// del nodo, así no hay que recalibrarlo si el diseñador reexporta a otra
-// escala: 1 unidad local = escala del nodo en metros.
-const Z_IRIS = 0.8215;
-const HUECO_R = 0.50;
-const HUECO_Y = 0.45;
+// El iris de este modelo es un disco plano mirando a +Z. Nuestra pupila se
+// dibuja justo delante. Medido: iris de 11,66 mm, separación entre ojos 61,6 mm.
+const OJO = { x: 0.0308, y: 1.6167, z: 0.1346 };
 
-// Cuánto baja la mandíbula con la boca abierta.
-const GRADOS_MANDIBULA = 26;
-
-/* SACAR LA LENGUA: se mueve el PRIMER HUESO de la cadena de la lengua, el de
- * la raíz, y los otros siete lo siguen. Dos cosas a la vez, porque con una
- * sola no se ve: se gira hacia arriba para que la lengua suba del piso de la
- * boca, y se adelanta a lo largo de la cadena para que la punta llegue a los
- * labios. Girar sin adelantar la enrosca hacia atrás y la punta termina
- * saliendo por el mentón.
- *
- * Lo que NO hay que tocar es la malla: una malla con esqueleto en modo
- * "attached" recalcula su matriz de enlace cada cuadro y cancela cualquier
- * movimiento del nodo; pasarla a "detached" la descoloca y la encoge, porque
- * el conjunto de la boca viene escalado. Los huesos sí se pueden mover, y los
- * pesos están limpios: la malla de la lengua está 100 % en los ocho huesos
- * "Tongue", y los dos arcos dentales están 100 % en los suyos, así que mover
- * la lengua no arrastra los dientes.
- *
- * Medido sobre este modelo: el avance va en el eje local Y del hueso, que es
- * el que corre de la raíz a la punta. */
-const GRADOS_LENGUA = -25;
-const AVANCE_LENGUA = 0.030;
+// Los dos morphs que el estudiante maneja desde el control.
+const MORPH_BOCA = "Expressions_mouthOpen_max";
+const MORPH_LENGUA = "Expressions_tongueOut_max";
 
 /* Cada vista dice QUÉ zona hay que ver, no dónde poner la cámara: la
  * distancia se calcula con la forma que tenga el panel en ese momento. Así el
  * encuadre sigue siendo correcto cuando se esconden los signos vitales y la
- * caja pasa de 820 a 1500 px de ancho. */
+ * caja pasa de 820 a 1500 px de ancho.
+ * La cabeza de este modelo mide 171 x 226 mm, con la barbilla en y=1,50 y la
+ * coronilla en y=1,73. La vista de labios va un poco más abierta que la de
+ * antes porque al abrir la boca el mentón baja 35 mm. */
 export const VISTAS = {
-  cara:   { centro: [0, 0.025, 0.030], ancho: 0.205, alto: 0.250, fov: 36 },
-  labios: { centro: [0, -0.038, 0.048], ancho: 0.092, alto: 0.064, fov: 24 },
-  ojos:   { centro: [0, 0.043, 0.032], ancho: 0.130, alto: 0.060, fov: 20 },
+  cara:   { centro: [0, 1.6080, 0.060], ancho: 0.200, alto: 0.256, fov: 36 },
+  labios: { centro: [0, 1.5465, 0.118], ancho: 0.108, alto: 0.078, fov: 24 },
+  ojos:   { centro: [0, 1.6167, 0.100], ancho: 0.122, alto: 0.056, fov: 20 },
 };
 
-/* El modelo se prepara UNA sola vez y se reutiliza. No se clona: clonar una
- * malla con esqueleto deja los huesos apuntando al original y la mandíbula
- * dejaría de moverse. Como el televisor solo muestra un visor a la vez, al
- * agregarlo a la escena nueva Three.js lo saca sola de la anterior. */
+/* El modelo se prepara UNA sola vez y se reutiliza. Como el televisor solo
+ * muestra un visor a la vez, al agregarlo a la escena nueva Three.js lo saca
+ * solo de la anterior. */
 let promesaModelo = null;
 
 function cargarModelo() {
@@ -125,17 +110,20 @@ const uniformesLengua = {
 };
 
 /* Tiñe la piel SIN perder la textura ni el relieve de la escultura: se
- * engancha al material que trae el modelo en vez de reemplazarlo. La
- * cianosis se concentra alrededor de la boca; el color de piel cubre toda la cara.
+ * engancha al material que trae el modelo en vez de reemplazarlo. La cianosis
+ * se concentra alrededor de la boca; el color de piel cubre toda la cara.
  * Se usa la posición en coordenadas de mundo, así que no importa cómo esté
- * escalado o rotado el nodo de la cabeza. */
+ * escalado o rotado el nodo de la cabeza.
+ * Ojo con "transformed" y no "position" en el vértice: este modelo tiene
+ * morphs, y lo que hay que mirar es la posición YA deformada; si no, la
+ * máscara se queda quieta cuando la boca se abre. */
 function pintarPiel(material) {
   material.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniformes);
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vMundo;")
       .replace("#include <begin_vertex>",
-        "#include <begin_vertex>\nvMundo = (modelMatrix * vec4(position, 1.0)).xyz;");
+        "#include <begin_vertex>\nvMundo = (modelMatrix * vec4(transformed, 1.0)).xyz;");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", `#include <common>
         varying vec3 vMundo;
@@ -146,7 +134,7 @@ function pintarPiel(material) {
         vec3 rel = vMundo - uBoca;
         rel.x *= uAchatado;
         float d = length(rel);
-        float mascara = 1.0 - smoothstep(uRadio * 0.55, uRadio * 1.15, d);
+        float mascara = 1.0 - smoothstep(uRadio * 0.60, uRadio * 1.10, d);
         vec3 piel = mix(diffuseColor.rgb, uColorPalidez, max(0.0, -uPiel) * 0.65);
         piel = mix(piel, uColorRubicundez, max(0.0, uPiel) * 0.5);
         piel = mix(piel, uColorCianosis, clamp(uCianosis, 0.0, 1.0) * (0.03 + 0.82 * mascara));
@@ -170,153 +158,105 @@ function pintarLengua(material) {
   material.needsUpdate = true;
 }
 
-/* El globo y la córnea son una sola malla cerrada, así que la cúpula de la
- * córnea queda por delante del iris y lo taparía. En vez de transparencia
- * (que trae problemas de orden de dibujo) se descarta el casquete frontal:
- * queda una ventana con el borde justo en el limbo. */
-function abrirCornea(material) {
-  material.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vLocalOjo;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLocalOjo = position;");
-    sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vLocalOjo;")
-      .replace("#include <clipping_planes_fragment>",
-        `if (vLocalOjo.y > ${HUECO_Y.toFixed(3)} && length(vLocalOjo.xz) < ${HUECO_R.toFixed(3)}) discard;
-         #include <clipping_planes_fragment>`);
-  };
-  material.needsUpdate = true;
-}
-
-function prepararOjo(nodo, pupilas) {
-  nodo.traverse((o) => {
-    if (!o.isMesh || !o.material) return;
-    const esIris = (o.material.name || "").startsWith("Iris");
-    const mat = new THREE.MeshStandardMaterial({
-      color: esIris ? COLOR_IRIS : COLOR_ESCLERA,
-      roughness: esIris ? 0.45 : 0.24,
-      metalness: 0,
-      side: THREE.FrontSide,
-    });
-    if (!esIris) abrirCornea(mat);
-    o.material = mat;
-  });
-
-  // Dentro del nodo del ojo el iris mira hacia +Y, no hacia +Z.
-  const pupila = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ color: 0x07090c })
-  );
-  pupila.position.set(0, Z_IRIS + 0.004, 0);
-  pupila.rotation.x = -Math.PI / 2;
-  nodo.add(pupila);
-  pupilas.push(pupila);
-
-  const brillo = new THREE.Mesh(
-    new THREE.CircleGeometry(0.085, 20),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
-  );
-  brillo.position.set(-0.21, Z_IRIS + 0.03, -0.21);
-  brillo.rotation.x = -Math.PI / 2;
-  nodo.add(brillo);
-}
-
 /* Gotas de sudor: esferitas pegadas a la frente, las sienes y las mejillas. Se
  * colocan lanzando rayos de frente contra la malla para que queden sobre la
- * piel de este modelo y no en el aire. */
+ * piel de este modelo y no en el aire. De cada ancla salen tres gotas con una
+ * pizca de azar, para que no se vean en cuadrícula. */
 function crearGotas(raiz, cabeza) {
   const rc = new THREE.Raycaster();
-  const geo = new THREE.SphereGeometry(1, 12, 10);
+  const geo = new THREE.SphereGeometry(1, 10, 8);
   const mat = new THREE.MeshStandardMaterial({
     color: 0xeaf6ff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0,
   });
-  // (x, y) en coordenadas de mundo; se evita la zona de los ojos.
-  const puntos = [
-    [0, 0.112], [-0.030, 0.100], [0.032, 0.102], [0, 0.082],
-    [-0.048, 0.086], [0.048, 0.084], [-0.022, 0.066], [0.024, 0.068],
-    [-0.058, 0.028], [0.058, 0.025], [-0.050, 0.002], [0.050, 0.000],
-    [-0.044, -0.020], [0.044, -0.018],
+  // (x, y) en metros, coordenadas de mundo. Frente, sienes y mejillas.
+  const anclas = [
+    [0, 1.686], [-0.020, 1.683], [0.020, 1.683], [-0.040, 1.676], [0.040, 1.676],
+    [0, 1.674], [-0.020, 1.671], [0.020, 1.671], [-0.042, 1.664], [0.042, 1.664],
+    [0, 1.662], [-0.022, 1.658], [0.022, 1.658], [-0.044, 1.652], [0.044, 1.652],
+    [-0.058, 1.620], [0.058, 1.620], [-0.054, 1.600], [0.054, 1.600],
+    [-0.048, 1.580], [0.048, 1.580], [-0.036, 1.566], [0.036, 1.566],
   ];
   const gotas = [];
-  for (const [x, y] of puntos) {
-    rc.set(new THREE.Vector3(x, y, 0.6), new THREE.Vector3(0, 0, -1));
-    const hit = rc.intersectObject(cabeza, true)[0];
-    if (!hit) continue;
-    // Si el rayo pegó en un borde muy inclinado (oreja, contorno de la cara)
-    // la gota se vería flotando fuera de la silueta, así que se descarta.
-    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-    if (normal.z < 0.3) continue;
-    const g = new THREE.Mesh(geo, mat.clone());
-    const escala = 0.0021 + Math.random() * 0.0013;
-    g.scale.setScalar(escala);
-    g.position.copy(hit.point).addScaledVector(normal, escala * 0.55);
-    g.userData = { yInicial: g.position.y };
-    raiz.add(g);
-    gotas.push(g);
+  for (const [ax, ay] of anclas) {
+    for (let k = 0; k < 3; k++) {
+      const x = ax + (Math.random() - 0.5) * 0.011;
+      const y = ay + (Math.random() - 0.5) * 0.008;
+      rc.set(new THREE.Vector3(x, y, 0.9), new THREE.Vector3(0, 0, -1));
+      const hit = rc.intersectObject(cabeza, true)[0];
+      if (!hit) continue;
+      // Si el rayo pegó en un borde muy inclinado (oreja, contorno de la cara)
+      // la gota se vería flotando fuera de la silueta, así que se descarta.
+      const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      if (normal.z < 0.3) continue;
+      const g = new THREE.Mesh(geo, mat.clone());
+      const escala = 0.00055 + Math.random() * 0.00045;
+      g.scale.setScalar(escala);
+      g.position.copy(hit.point).addScaledVector(normal, escala * 0.55);
+      g.userData = { yInicial: g.position.y };
+      raiz.add(g);
+      gotas.push(g);
+    }
   }
   return gotas;
 }
 
 /* Deja el modelo listo una sola vez: materiales, pupilas, gotas, y las
- * referencias que hacen falta para abrir la boca. */
+ * referencias que hacen falta para las maniobras. */
 function prepararModelo(raiz) {
   raiz.updateMatrixWorld(true);
 
   const pupilas = [];
+  const morphs = { boca: [], lengua: [] };
   let materialPiel = null;
-  let escalaOjo = 0.01293;
   let cabeza = null;
-  const morphs = [];
 
-  for (const nodo of raiz.children.slice()) {
-    if (/^Eye/i.test(nodo.name)) {
-      const e = new THREE.Vector3();
-      nodo.getWorldScale(e);
-      escalaOjo = e.x;
-      prepararOjo(nodo, pupilas);
-      continue;
+  raiz.traverse((o) => {
+    if (!o.isMesh) return;
+    const dicc = o.morphTargetDictionary || {};
+    if (MORPH_BOCA in dicc) morphs.boca.push({ malla: o, indice: dicc[MORPH_BOCA] });
+    if (MORPH_LENGUA in dicc) morphs.lengua.push({ malla: o, indice: dicc[MORPH_LENGUA] });
+
+    const nombre = (o.material && o.material.name) || "";
+    // La pupila del modelo se esconde: dibujamos la nuestra, en milímetros.
+    if (/pupil/i.test(nombre)) { o.visible = false; return; }
+    o.material = o.material.clone();          // conserva textura y normales
+    if (/tongue/i.test(nombre)) {
+      pintarLengua(o.material);
+    } else if (/skin/i.test(nombre)) {
+      materialPiel = o.material;
+      pintarPiel(o.material);
+      // la malla más grande con piel es el cuerpo, y es contra esa que se
+      // lanzan los rayos de las gotas
+      const n = o.geometry.attributes.position.count;
+      if (!cabeza || n > cabeza.geometry.attributes.position.count) cabeza = o;
     }
-    nodo.traverse((o) => {
-      if (o.morphTargetDictionary && "jawOpen" in o.morphTargetDictionary) {
-        morphs.push({ malla: o, indice: o.morphTargetDictionary.jawOpen });
-      }
-      if (!o.isMesh && !o.isSkinnedMesh) return;
-      if (!o.material) return;
-      const nombre = o.material.name || "";
-      o.material = o.material.clone();        // conserva textura y normales
-      if (nombre === "Lengua") {
-        pintarLengua(o.material);
-      } else if (!/^(Lower|Upper|Throat)$/.test(nombre)) {
-        materialPiel = o.material;            // la piel de la cara
-        cabeza = o;
-        pintarPiel(o.material);
-      }
-    });
+  });
+
+  // Pupila propia: un disco plano justo delante del iris, con su reflejo.
+  for (const lado of [-1, 1]) {
+    const pupila = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 48),
+      new THREE.MeshBasicMaterial({ color: 0x07090c })
+    );
+    pupila.position.set(lado * OJO.x, OJO.y, OJO.z);
+    raiz.add(pupila);
+    pupilas.push(pupila);
+
+    const brillo = new THREE.Mesh(
+      new THREE.CircleGeometry(0.00055, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+    );
+    brillo.position.set(lado * OJO.x - 0.0022, OJO.y + 0.0022, OJO.z + 0.0002);
+    raiz.add(brillo);
   }
 
-
-  const mandibula = raiz.getObjectByName("Human_-_Lower_Jaw_1")
-                 || raiz.getObjectByName("Human - Lower Jaw");
-  const mandibulaBase = mandibula ? mandibula.rotation.x : 0;
-  // El hueso de la RAÍZ de la lengua. Arrastra a los otros siete.
-  const lengua = raiz.getObjectByName("Human_-_Tongue000")
-              || raiz.getObjectByName("Human - Tongue.000");
-  const lenguaBase = lengua
-    ? { giro: lengua.rotation.x, avance: lengua.position.y }
-    : null;
   const gotas = cabeza ? crearGotas(raiz, cabeza) : [];
-
-  return {
-    raiz, pupilas, gotas, materialPiel, morphs,
-    mandibula, mandibulaBase, lengua, lenguaBase,
-    // 1 unidad local del ojo medida en milímetros de mundo.
-    mmPorUnidad: escalaOjo * 1000,
-  };
+  return { raiz, pupilas, gotas, materialPiel, morphs };
 }
 
 export function crearVisor(contenedor) {
   const escena = new THREE.Scene();
-  const camara = new THREE.PerspectiveCamera(VISTAS.cara.fov, 1, 0.005, 50);
+  const camara = new THREE.PerspectiveCamera(VISTAS.cara.fov, 1, 0.002, 50);
   const render = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   render.setPixelRatio(Math.min(devicePixelRatio, 2));
   render.outputColorSpace = THREE.SRGBColorSpace;
@@ -324,16 +264,16 @@ export function crearVisor(contenedor) {
   Object.assign(render.domElement.style, { width: "100%", height: "100%", display: "block" });
 
   escena.add(new THREE.AmbientLight(0xbfd6ff, 0.60));
-  const principal = new THREE.DirectionalLight(0xffffff, 1.9);
-  principal.position.set(0.6, 1.0, 1.8);
+  const principal = new THREE.DirectionalLight(0xffffff, 2.0);
+  principal.position.set(0.5, 2.2, 1.8);
   escena.add(principal);
   const relleno = new THREE.DirectionalLight(0x7fb0ff, 0.55);
-  relleno.position.set(-1.6, 0.3, 1.0);
+  relleno.position.set(-1.4, 1.8, 1.0);
   escena.add(relleno);
   // Con la boca abierta el interior queda en sombra y la lengua no se ve. Esta
   // luz se enciende sola con la apertura y no toca el resto de la cara.
   const luzBoca = new THREE.PointLight(0xffe9e2, 0, 0.09, 2);
-  luzBoca.position.set(0, BOCA.y + 0.004, BOCA.z + 0.012);
+  luzBoca.position.set(0, BOCA.y + 0.004, BOCA.z - 0.012);
   escena.add(luzBoca);
 
   let modelo = null;
@@ -344,30 +284,22 @@ export function crearVisor(contenedor) {
 
   function aplicarPupila(mm) {
     if (!modelo) return;
-    const r = (Math.min(Math.max(mm, 0.8), 9) / 2) / modelo.mmPorUnidad;
+    // el modelo está en metros, así que el radio en metros es mm/2/1000
+    const r = Math.min(Math.max(mm, 0.8), 9) / 2000;
     for (const p of modelo.pupilas) p.scale.set(r, r, 1);
   }
 
-  /* Abrir la boca son dos cosas a la vez: el morph de la cabeza separa los
-   * labios, y el hueso de la mandíbula baja la dentadura. Con el morph solo se
-   * vería una boca abierta con los dientes apretados. */
+  /* Abrir la boca y sacar la lengua son morphs del propio modelo. */
   function aplicarBoca(v) {
     if (!modelo) return;
     const k = Math.min(Math.max(v, 0), 1);
-    for (const m of modelo.morphs) m.malla.morphTargetInfluences[m.indice] = k;
-    if (modelo.mandibula) {
-      modelo.mandibula.rotation.x = modelo.mandibulaBase + (k * GRADOS_MANDIBULA * Math.PI) / 180;
-    }
-    luzBoca.intensity = k * 0.004;
+    for (const m of modelo.morphs.boca) m.malla.morphTargetInfluences[m.indice] = k;
+    luzBoca.intensity = k * 0.012;
   }
-
-  /* Sacar la lengua: giro y avance del hueso de la raíz, los dos a la vez.
-   * Ver el porqué arriba, junto a las constantes. */
   function aplicarLengua(v) {
-    if (!modelo || !modelo.lengua) return;
+    if (!modelo) return;
     const k = Math.min(Math.max(v, 0), 1);
-    modelo.lengua.rotation.x = modelo.lenguaBase.giro + (k * GRADOS_LENGUA * Math.PI) / 180;
-    modelo.lengua.position.y = modelo.lenguaBase.avance + k * AVANCE_LENGUA;
+    for (const m of modelo.morphs.lengua) m.malla.morphTargetInfluences[m.indice] = k;
   }
 
   cargarModelo().then(
@@ -459,8 +391,8 @@ export function crearVisor(contenedor) {
     bocaObjetivo = maniobras && maniobras.boca ? 1 : 0;
     lenguaObjetivo = maniobras && maniobras.lengua ? 1 : 0;
     const sudor = visual.sudor || 0;
-    if (modelo && modelo.materialPiel) modelo.materialPiel.roughness = 1 - sudor * 0.55;
-    if (modelo) for (const g of modelo.gotas) g.material.opacity = sudor * 0.45;
+    if (modelo && modelo.materialPiel) modelo.materialPiel.roughness = 0.72 - sudor * 0.45;
+    if (modelo) for (const g of modelo.gotas) g.material.opacity = sudor * 0.62;
     repintar();
   }
 
@@ -498,14 +430,13 @@ export function crearVisor(contenedor) {
       aplicarPupila(mmActual);
       repintar();
     }
-    // La boca abre y cierra despacio, y la lengua sale despacio: el salto seco
-    // se ve a tirones en el televisor.
+    // La boca abre y cierra despacio: el salto seco se ve a tirones.
     if (Math.abs(bocaObjetivo - bocaActual) > 0.002) {
       bocaActual = acercar(bocaActual, bocaObjetivo, 0.30, dt);
       aplicarBoca(bocaActual);
       repintar();
     }
-    // La lengua va un poco más lenta que la boca: primero se abre, después sale.
+    // La lengua va un poco más lenta: primero se abre la boca, después sale.
     if (Math.abs(lenguaObjetivo - lenguaActual) > 0.002) {
       lenguaActual = acercar(lenguaActual, lenguaObjetivo, 0.40, dt);
       aplicarLengua(lenguaActual);
@@ -515,8 +446,8 @@ export function crearVisor(contenedor) {
     if (modelo) {
       for (const g of modelo.gotas) {
         if (g.material.opacity > 0.02) {
-          g.position.y -= dtGota * 0.006;
-          if (g.position.y < g.userData.yInicial - 0.025) g.position.y = g.userData.yInicial;
+          g.position.y -= dtGota * 0.0035;
+          if (g.position.y < g.userData.yInicial - 0.014) g.position.y = g.userData.yInicial;
           repintar();
         }
       }
