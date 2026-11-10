@@ -25,6 +25,7 @@ Registro:
     registros/sesion_AAAAMMDD_HHMMSS.jsonl — para analizar las pruebas de usuario después.
 """
 import json
+import math
 import os
 import socket
 import sys
@@ -87,6 +88,44 @@ def formatear_vital(clave, valor):
     return f"{valor:.{dec}f}" if dec else f"{round(valor)}"
 
 
+def vitales_simulados(toxidrome, segundos):
+    """Valores de DEMOSTRACIÓN, para cuando no hay simulador prestado.
+
+    No son una medición: salen de la tabla de los médicos de UCI, de la columna
+    que la cara NO puede mostrar (FC y TA, respiración, temperatura). Cada
+    toxidrome trae los suyos en contenido.json. Se les mete un vaivén pequeño
+    para que el monitor no parezca una foto; el vaivén es una onda, no azar,
+    así dos pantallas mirando el mismo instante muestran lo mismo.
+
+    El televisor los marca SIM y lo dice en pantalla. Nunca se mandan como
+    reales: `datos_reales` sigue en falso.
+    """
+    base = (TOXIDROMES.get(toxidrome) or TOXIDROMES["basal"]).get("vitales_demo")
+    if not base:
+        return {}
+    vaiven = math.sin(segundos * 0.7)
+    vaiven2 = math.sin(segundos * 0.37 + 1.1)
+    salida = {}
+    for clave, valor in base.items():
+        d = DATOS["signos_vitales"].get(clave)
+        if d is None:
+            continue
+        if clave == "ta":
+            v = [valor[0] + round(vaiven * 3), valor[1] + round(vaiven2 * 2)]
+        elif clave == "temp":
+            v = round(valor + vaiven2 * 0.1, 1)
+        elif clave == "spo2":
+            v = min(100, max(50, valor + round(vaiven * 1)))
+        elif clave == "fc":
+            v = max(20, valor + round(vaiven * 2))
+        else:
+            v = max(0, valor + round(vaiven2 * 1))
+        salida[clave] = {"nombre": d["nombre"], "unidad": d["unidad"], "valor": v,
+                         "texto": formatear_vital(clave, v),
+                         "severidad": severidad_vital(clave, v), "origen": "sim"}
+    return salida
+
+
 def escala_de(nombre, valor):
     """Cómo se llama lo que se está viendo, según la escala del signo. Es lo
     que lee el profesor en su panel; al estudiante no se le escribe nunca."""
@@ -122,6 +161,9 @@ class Estado:
         # lector
         self.lector_valores = {}
         self.lector_ts = 0.0
+        # Vitales de demostración: los prende el profesor a mano cuando no hay
+        # simulador. Si el lector real aparece, manda el real.
+        self.vitales_demo = False
         # control remoto (un solo celular)
         self.controlador = None
         self.visto = {}          # cid -> última vez que se vio conectado
@@ -176,6 +218,8 @@ class Estado:
         # estorba más de lo que ayuda, y además se presta para que el grupo
         # razone con un dato que nadie midió.
         vitales = {}
+        if not real and self.vitales_demo:
+            vitales = vitales_simulados(self.toxidrome, self.transcurrido())
         if real:
             for clave, valor in self.lector_valores.items():
                 d = DATOS["signos_vitales"].get(clave)
@@ -233,6 +277,7 @@ class Estado:
             "sistema_seleccionado": self.sistema,
             "subvista": self.subvista,
             "datos_reales": real,
+            "vitales_demo": self.vitales_demo,
             "controlador": self.controlador if control_activo else None,
             "sesion_id": self.sesion_id,
             "urls": {**URLS, "control": ips_urls()},
@@ -582,6 +627,9 @@ class Manejador(BaseHTTPRequestHandler):
                 E.signos[nombre] = d["normal"]
             E.toxidrome = None
             E.registrar("signos_normales")
+        elif accion == "vitales_demo":
+            E.vitales_demo = (not E.vitales_demo) if valor is None else bool(valor)
+            E.registrar("vitales_demo", valor=E.vitales_demo)
         elif accion == "url_control":
             E.url_control = str(valor) if valor else None
             E.registrar("url_control", valor=E.url_control)

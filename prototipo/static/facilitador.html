@@ -142,6 +142,7 @@
     <button class="bt primario" id="btIniciar">Iniciar sesión</button>
     <button class="bt" id="btPausar">Pausar</button>
     <button class="bt peligro" id="btReiniciar">Reiniciar</button>
+    <button class="bt" id="btVitales">Signos vitales</button>
     <button class="bt" id="btMonitor">Abrir televisor</button>
   </div>
 
@@ -207,6 +208,10 @@ const arrastrando = {};     // signo -> true mientras el profesor tiene el dedo 
 
 const accion = (a, v) => enviar("/api/facilitador", { accion: a, valor: v });
 
+/* Sin el simulador prestado no hay vitales de verdad. Este botón enciende
+ * unos de DEMOSTRACIÓN, sacados de la tabla de los médicos, para poder mostrar
+ * el producto completo. El televisor los marca como simulados. */
+$("btVitales").onclick = () => accion("vitales_demo");
 $("btIniciar").onclick = () => accion("iniciar");
 $("btPausar").onclick = () => accion("pausar");
 $("btReiniciar").onclick = () => { if (confirm("¿Reiniciar la sesión? Los signos vuelven a lo normal y empieza un registro nuevo.")) accion("reiniciar"); };
@@ -310,6 +315,13 @@ function render(s) {
   $("estadoTxt").textContent = s.estado_paciente;
   $("reloj").textContent = reloj(s.transcurrido_s);
   $("reloj").classList.toggle("pausa", s.iniciado && !s.corriendo);
+  const vd = !!s.vitales_demo, vr = !!s.datos_reales;
+  $("btVitales").classList.toggle("primario", vd && !vr);
+  $("btVitales").textContent = vr ? "Vitales reales" : (vd ? "Vitales simulados: SÍ" : "Signos vitales");
+  $("btVitales").disabled = vr;
+  $("btVitales").title = vr
+    ? "El lector del simulador está conectado: el televisor muestra los valores reales."
+    : "Enciende o apaga unos signos vitales de demostración en el televisor. Van marcados SIM.";
   $("btIniciar").textContent = s.iniciado ? (s.corriendo ? "En curso" : "Reanudar") : "Iniciar sesión";
   $("btIniciar").disabled = s.corriendo;
   $("btPausar").disabled = !s.corriendo;

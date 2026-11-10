@@ -67,6 +67,34 @@ function escalaDe(nombre, valor) {
   return [texto, sev];
 }
 
+/* Valores de DEMOSTRACIÓN, para cuando no hay simulador prestado.
+   No son una medición: salen de la tabla de los médicos de UCI, de la columna
+   que la cara NO puede mostrar (FC y TA, respiración, temperatura). Cada
+   toxidrome trae los suyos en contenido.json. El vaivén es una onda y no azar,
+   así dos pantallas mirando el mismo instante muestran lo mismo.
+   El televisor los marca SIM: `datos_reales` sigue en falso. */
+function vitalesSimulados(toxidrome, segundos) {
+  const base = (TOXIDROMES[toxidrome] || TOXIDROMES.basal || {}).vitales_demo;
+  if (!base) return {};
+  const vaiven = Math.sin(segundos * 0.7);
+  const vaiven2 = Math.sin(segundos * 0.37 + 1.1);
+  const salida = {};
+  for (const [clave, valor] of Object.entries(base)) {
+    const d = DATOS.signos_vitales[clave];
+    if (!d) continue;
+    let v;
+    if (clave === "ta") v = [valor[0] + Math.round(vaiven * 3), valor[1] + Math.round(vaiven2 * 2)];
+    else if (clave === "temp") v = Math.round((valor + vaiven2 * 0.1) * 10) / 10;
+    else if (clave === "spo2") v = Math.min(100, Math.max(50, valor + Math.round(vaiven)));
+    else if (clave === "fc") v = Math.max(20, valor + Math.round(vaiven * 2));
+    else v = Math.max(0, valor + Math.round(vaiven2));
+    salida[clave] = { nombre: d.nombre, unidad: d.unidad, valor: v,
+                      texto: formatearVital(clave, v),
+                      severidad: severidadVital(clave, v), origen: "sim" };
+  }
+  return salida;
+}
+
 function limitarSigno(nombre, valor) {
   const d = SIGNOS[nombre];
   return Math.max(d.min, Math.min(d.max, Number(valor)));
@@ -78,6 +106,9 @@ const E = {
   url_control: null,            // cuál de las direcciones se muestra en el QR
   lector_valores: {},
   lector_ts: 0,
+  // Vitales de demostración: los prende el profesor a mano cuando no hay
+  // simulador. Si el lector real aparece, manda el real.
+  vitales_demo: false,
   controlador: null,
   visto: {},
   snapshot: {},
@@ -139,7 +170,8 @@ function calcular() {
   // Vitales: SOLO si el lector del simulador manda datos reales. Sin lector no
   // se muestran: un número simulado al lado de la cara estorba más de lo que
   // ayuda, y se presta para que el grupo razone con un dato que nadie midió.
-  const vitales = {};
+  let vitales = {};
+  if (!real && E.vitales_demo) vitales = vitalesSimulados(E.toxidrome, transcurrido());
   if (real) {
     for (const [clave, valor] of Object.entries(E.lector_valores)) {
       const d = DATOS.signos_vitales[clave];
@@ -190,6 +222,7 @@ function calcular() {
     sistema_seleccionado: E.sistema,
     subvista: E.subvista,
     datos_reales: real,
+    vitales_demo: E.vitales_demo,
     controlador: controlActivo ? E.controlador : null,
     sesion_id: E.sesion_id,
     urls: { ...URLS, control: urlsControl() },
@@ -384,6 +417,9 @@ function facilitador(c) {
     for (const [nombre, d] of Object.entries(SIGNOS)) E.signos[nombre] = d.normal;
     E.toxidrome = null;
     registrar("signos_normales");
+  } else if (accion === "vitales_demo") {
+    E.vitales_demo = c.valor === undefined ? !E.vitales_demo : Boolean(c.valor);
+    registrar("vitales_demo", { valor: E.vitales_demo });
   } else if (accion === "url_control") {
     E.url_control = valor ? String(valor) : null;
     registrar("url_control", { valor: E.url_control });

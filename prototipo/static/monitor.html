@@ -457,7 +457,11 @@ function render(e) {
   // simulador. Sin lector no hay columna: un número simulado al lado de la
   // cara estorba, y encima invita a razonar con un dato que nadie midió.
   // Los visores se reajustan solos (tienen ResizeObserver).
-  const hayVitales = !!e.datos_reales && Object.keys(e.vitales || {}).length > 0;
+  // Hay vitales si vienen del monitor REAL del simulador, o si el profesor
+  // encendió a mano los de demostración. En ese segundo caso el televisor lo
+  // dice en pantalla y cada número va marcado SIM, para que nadie los
+  // confunda con una medición.
+  const hayVitales = Object.keys(e.vitales || {}).length > 0;
   $("escenario").classList.toggle("sin-vitales", !hayVitales);
   $("titulo").textContent = "Paciente en urgencias";
   $("subtitulo").textContent = "Observen al paciente y digan qué le pasa";
@@ -469,8 +473,10 @@ function render(e) {
   $("estadoTxt").textContent = e.estado_paciente;
 
   // El distintivo de la fuente solo tiene sentido si hay vitales que calificar.
-  $("fuente").className = "chip real" + (hayVitales ? "" : " oculto");
-  $("fuenteTxt").textContent = "DATOS REALES DEL SIMULADOR";
+  $("fuente").className = "chip " + (e.datos_reales ? "real" : "demo") + (hayVitales ? "" : " oculto");
+  $("fuenteTxt").textContent = e.datos_reales
+    ? "DATOS REALES DEL SIMULADOR"
+    : "VALORES SIMULADOS · NO SON UNA MEDICIÓN";
 
   const ctl = $("ctl");
   ctl.classList.toggle("on", !!e.controlador);
