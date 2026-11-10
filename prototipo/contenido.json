@@ -118,6 +118,36 @@
           "crit"
         ]
       ]
+    },
+    "conciencia": {
+      "nombre": "Estado de conciencia",
+      "min": 0.0,
+      "max": 1.0,
+      "normal": 0.0,
+      "paso": 0.01,
+      "unidad": "",
+      "donde": "los párpados, la mirada y la boca en 3D",
+      "extremos": [
+        "Alerta",
+        "Estuporoso"
+      ],
+      "escala": [
+        [
+          0.0,
+          "Alerta",
+          "ok"
+        ],
+        [
+          0.3,
+          "Somnoliento",
+          "warn"
+        ],
+        [
+          0.65,
+          "Estuporoso, mirada perdida",
+          "crit"
+        ]
+      ]
     }
   },
   "_nota_cianosis": "La cianosis no está en la tabla. Se dejó porque es la cara visible de la depresión respiratoria, que sí está (columna Resp.) y que de otro modo no se podría mostrar. Si el toxicólogo prefiere que no aparezca, se pone en cero en cada toxidrome.",
@@ -131,7 +161,8 @@
         "pupila_mm": 4.0,
         "piel": 0.0,
         "sudor": 0.0,
-        "cianosis": 0.0
+        "cianosis": 0.0,
+        "conciencia": 0.0
       },
       "vitales_demo": {
         "fc": 78,
@@ -155,7 +186,8 @@
         "pupila_mm": 7.5,
         "piel": 0.85,
         "sudor": 0.0,
-        "cianosis": 0.0
+        "cianosis": 0.0,
+        "conciencia": 0.45
       },
       "vitales_demo": {
         "fc": 128,
@@ -179,7 +211,8 @@
         "pupila_mm": 1.5,
         "piel": 0.0,
         "sudor": 1.0,
-        "cianosis": 0.0
+        "cianosis": 0.0,
+        "conciencia": 0.25
       },
       "vitales_demo": {
         "fc": 72,
@@ -203,7 +236,8 @@
         "pupila_mm": 1.4,
         "piel": -0.6,
         "sudor": 0.0,
-        "cianosis": 0.85
+        "cianosis": 0.85,
+        "conciencia": 0.9
       },
       "vitales_demo": {
         "fc": 48,
@@ -227,7 +261,8 @@
         "pupila_mm": 7.0,
         "piel": 0.5,
         "sudor": 0.9,
-        "cianosis": 0.0
+        "cianosis": 0.0,
+        "conciencia": 0.0
       },
       "vitales_demo": {
         "fc": 142,
@@ -251,7 +286,8 @@
         "pupila_mm": 4.0,
         "piel": -0.45,
         "sudor": 0.0,
-        "cianosis": 0.3
+        "cianosis": 0.3,
+        "conciencia": 0.8
       },
       "vitales_demo": {
         "fc": 54,
@@ -365,5 +401,6 @@
     }
   },
   "_nota_vitales": "Con el lector del monitor del simulador conectado, el televisor muestra los valores REALES. Sin lector no se muestra nada, salvo que el profesor encienda a mano los VALORES SIMULADOS desde su panel: ahí se usan los 'vitales_demo' de cada toxidrome, que salen de la columna de la tabla de los médicos que la cara no puede mostrar (FC y TA, respiración y temperatura). El televisor los marca SIM y lo dice en pantalla, para que nadie los confunda con una medición.",
-  "_nota_ruidos": "Ruidos intestinales: es la sexta columna de la tabla de los médicos y la única que no se puede ver, solo oír. El estudiante ausculta el abdomen desde su control (o el profesor desde el panel) y el televisor reproduce lo que se oiría: aumentados, normales o ausentes según el toxidrome. 'Ausentes' no es silencio total: se oye el fonendoscopio sin ruidos, que es lo que se oye de verdad y además evita que el grupo crea que se dañó el sonido."
+  "_nota_ruidos": "Ruidos intestinales: es la sexta columna de la tabla de los médicos y la única que no se puede ver, solo oír. El estudiante ausculta el abdomen desde su control (o el profesor desde el panel) y el televisor reproduce lo que se oiría: aumentados, normales o ausentes según el toxidrome. 'Ausentes' no es silencio total: se oye el fonendoscopio sin ruidos, que es lo que se oye de verdad y además evita que el grupo crea que se dañó el sonido.",
+  "_nota_conciencia": "El nivel de conciencia es el signo más visible de todos y no estaba en la tabla de los médicos, que es de signos físicos. Se mueve en un solo eje, de alerta a estuporoso: los párpados bajan, las cejas caen, la boca se entreabre y la mirada se va hacia arriba. El parpadeo también se hace más lento y más raro. Ojo: el anticolinérgico en la vida real es un delirio AGITADO, no somnolencia; acá se representa como 'perdido' por simplificar el eje. Es de lo primero que hay que confirmar con el toxicólogo."
 }

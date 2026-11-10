@@ -58,9 +58,21 @@ const ACHATADO_BOCA = 0.5;
 // dibuja justo delante. Medido: iris de 11,66 mm, separación entre ojos 61,6 mm.
 const OJO = { x: 0.0308, y: 1.6167, z: 0.1346 };
 
-// Los dos morphs que el estudiante maneja desde el control.
+// Los morphs que usamos, por nombre. Los dos primeros son las maniobras del
+// estudiante; los demás arman el estado de conciencia y el parpadeo.
 const MORPH_BOCA = "Expressions_mouthOpen_max";
 const MORPH_LENGUA = "Expressions_tongueOut_max";
+const MORPH_PARPADEO = ["Expressions_eyeClosedL_max", "Expressions_eyeClosedR_max"];
+const MORPH_CONCIENCIA = {
+  // párpados a media asta
+  entrecerrar: ["Expressions_eyeSquintL_max", "Expressions_eyeSquintR_max"],
+  // cejas caídas
+  cejas: ["Expressions_browOutVertL_min", "Expressions_browOutVertR_min"],
+  // boca entreabierta
+  bocaFloja: ["Expressions_mouthOpenHalf_max"],
+  // la mirada que se va hacia arriba, solo en estupor
+  miradaArriba: ["Expressions_eyesVert_max"],
+};
 
 /* Cada vista dice QUÉ zona hay que ver, no dónde poner la cámara: la
  * distancia se calcula con la forma que tenga el panel en ese momento. Así el
@@ -206,7 +218,8 @@ function prepararModelo(raiz) {
   raiz.updateMatrixWorld(true);
 
   const pupilas = [];
-  const morphs = { boca: [], lengua: [] };
+  const morphs = { boca: [], lengua: [], parpadeo: [],
+                   entrecerrar: [], cejas: [], bocaFloja: [], miradaArriba: [] };
   let materialPiel = null;
   let cabeza = null;
 
@@ -215,6 +228,9 @@ function prepararModelo(raiz) {
     const dicc = o.morphTargetDictionary || {};
     if (MORPH_BOCA in dicc) morphs.boca.push({ malla: o, indice: dicc[MORPH_BOCA] });
     if (MORPH_LENGUA in dicc) morphs.lengua.push({ malla: o, indice: dicc[MORPH_LENGUA] });
+    for (const n of MORPH_PARPADEO) if (n in dicc) morphs.parpadeo.push({ malla: o, indice: dicc[n] });
+    for (const [grupo, lista] of Object.entries(MORPH_CONCIENCIA))
+      for (const n of lista) if (n in dicc) morphs[grupo].push({ malla: o, indice: dicc[n] });
 
     const nombre = (o.material && o.material.name) || "";
     // La pupila del modelo se esconde: dibujamos la nuestra, en milímetros.
@@ -281,6 +297,11 @@ export function crearVisor(contenedor) {
   let mmObjetivo = 4, mmActual = 4;
   let bocaObjetivo = 0, bocaActual = 0;
   let lenguaObjetivo = 0, lenguaActual = 0;
+  let concObjetivo = 0, concActual = 0;
+  // Parpadeo: el paciente parpadea solo. Cuanto más dormido, más lento y más
+  // raro, que es como se ve de verdad y se lee a primera vista desde el fondo
+  // del salón.
+  let parpadeo = 0, proximoParpadeo = 2, relojParpadeo = 0;
 
   function aplicarPupila(mm) {
     if (!modelo) return;
@@ -302,6 +323,25 @@ export function crearVisor(contenedor) {
     for (const m of modelo.morphs.lengua) m.malla.morphTargetInfluences[m.indice] = k;
   }
 
+  const poner = (lista, v) => { for (const m of lista) m.malla.morphTargetInfluences[m.indice] = v; };
+
+  /* La cara del nivel de conciencia, en un solo eje de 0 a 1. De alerta a
+   * estuporoso: primero bajan los párpados y caen las cejas, después se
+   * entreabre la boca, y solo en estupor la mirada se va hacia arriba.
+   * El parpadeo manda sobre el entrecerrado para que el ojo llegue a cerrarse
+   * del todo en vez de quedarse a medias. */
+  function aplicarCara() {
+    if (!modelo) return;
+    const c = Math.min(Math.max(concActual, 0), 1);
+    const m = modelo.morphs;
+    poner(m.parpadeo, parpadeo);
+    poner(m.entrecerrar, c * 0.75 * (1 - parpadeo));
+    poner(m.cejas, c * 0.60);
+    // si el estudiante le abrió la boca, la boca floja estorba
+    poner(m.bocaFloja, Math.max(0, c - 0.25) * 0.80 * (1 - bocaActual));
+    poner(m.miradaArriba, Math.max(0, c - 0.50) * 1.10);
+  }
+
   cargarModelo().then(
     (m) => {
       modelo = m;
@@ -309,6 +349,7 @@ export function crearVisor(contenedor) {
       aplicarPupila(mmActual);
       aplicarBoca(bocaActual);
       aplicarLengua(lenguaActual);
+      aplicarCara();
       cargado = true;
       contenedor.dataset.estado = "listo";
       ajustarTamano();
@@ -387,6 +428,7 @@ export function crearVisor(contenedor) {
     uniformes.uCianosis.value = visual.cianosis || 0;
     uniformes.uPiel.value = visual.piel || 0;
     mmObjetivo = visual.pupila_mm || 4;
+    concObjetivo = visual.conciencia || 0;
     // Las maniobras las hace el estudiante desde el control, no el escenario.
     bocaObjetivo = maniobras && maniobras.boca ? 1 : 0;
     lenguaObjetivo = maniobras && maniobras.lengua ? 1 : 0;
@@ -440,6 +482,30 @@ export function crearVisor(contenedor) {
     if (Math.abs(lenguaObjetivo - lenguaActual) > 0.002) {
       lenguaActual = acercar(lenguaActual, lenguaObjetivo, 0.40, dt);
       aplicarLengua(lenguaActual);
+      repintar();
+    }
+    // El nivel de conciencia cambia despacio: un paciente no se duerme de golpe.
+    const cambiaConc = Math.abs(concObjetivo - concActual) > 0.002;
+    if (cambiaConc) concActual = acercar(concActual, concObjetivo, 1.2, dt);
+    // Parpadeo automático. Alerta: cada 3 a 6 s y dura 0,15 s. Estuporoso:
+    // cada 9 a 16 s y dura medio segundo, con los párpados pesados.
+    relojParpadeo += dt;
+    const c = Math.min(Math.max(concActual, 0), 1);
+    const duracion = 0.15 + c * 0.35;
+    if (relojParpadeo >= proximoParpadeo) {
+      const t = relojParpadeo - proximoParpadeo;
+      if (t >= duracion) {
+        parpadeo = 0;
+        relojParpadeo = 0;
+        proximoParpadeo = (3 + Math.random() * 3) + c * (6 + Math.random() * 7);
+      } else {
+        // sube y baja suave: sin(pi*t) va de 0 a 1 y vuelve a 0
+        parpadeo = Math.sin(Math.PI * (t / duracion));
+      }
+      aplicarCara();
+      repintar();
+    } else if (cambiaConc) {
+      aplicarCara();
       repintar();
     }
     // Las gotas resbalan despacio y vuelven a empezar.

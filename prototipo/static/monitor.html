@@ -484,6 +484,7 @@ function render(e) {
   // Mientras el estudiante ausculta, el salón tiene que saber por qué suena
   // (y sobre todo, si no suena nada, que eso ES el hallazgo).
   $("ausculta").classList.toggle("oculto", !(e.maniobras && e.maniobras.abdomen));
+  Sonido.pintarBoton();
 
   if (hayVitales && Object.values(e.vitales).some((v) => v.severidad === "crit")) Sonido.alarma();
   $("fuente").className = "chip " + (e.datos_reales ? "real" : "demo") + (hayVitales ? "" : " oculto");
@@ -657,7 +658,11 @@ const Sonido = (() => {
   function latido(spo2) {
     if (!encendido || !ctx) return;
     const sat = Math.min(100, Math.max(60, Number(spo2) || 98));
-    muestra("pitido", 0.5, Math.pow(2, -(100 - sat) / 26));
+    // Si por lo que sea la grabación no cargó (servidor sin reiniciar, archivo
+    // movido), suena el tono sintetizado. El pitido nunca se queda mudo en
+    // silencio: eso es peor que un pitido feo.
+    if (!muestra("pitido", 0.5, Math.pow(2, -(100 - sat) / 26)))
+      tono(880 * Math.pow(2, -(100 - sat) / 24), 0.09, 0.14);
   }
 
   function alarma() {
@@ -726,7 +731,11 @@ const Sonido = (() => {
     const b = $("btSonido");
     if (!b) return;
     b.classList.toggle("on", encendido);
-    $("sonidoTxt").textContent = encendido ? "SONIDO: SÍ" : "SONIDO: NO";
+    // Sin vitales no hay frecuencia cardiaca, así que no hay latido que pitar.
+    // Decirlo evita la pregunta "¿por qué no suena?".
+    const hayFc = !!(estado && estado.vitales && estado.vitales.fc);
+    $("sonidoTxt").textContent = !encendido ? "SONIDO: NO"
+      : (hayFc ? "SONIDO: SÍ" : "SONIDO: SÍ · FALTAN VITALES");
   }
 
   return { latido, alarma, abdomen, alternar, pintarBoton, activo: () => encendido };
