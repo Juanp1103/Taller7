@@ -148,6 +148,9 @@ def limitar_signo(nombre, valor):
 MANIOBRAS = {
     "boca":   {"nombre": "Abrir la boca", "exige": None, "disponible": True},
     "lengua": {"nombre": "Sacar la lengua", "exige": "boca", "disponible": True},
+    # La única de la tabla que no se ve, solo se oye. No exige nada: el
+    # fonendoscopio va al abdomen, no a la cara.
+    "abdomen": {"nombre": "Auscultar el abdomen", "exige": None, "disponible": True},
 }
 
 
@@ -231,6 +234,12 @@ class Estado:
 
         visual = {n: round(v, 3) for n, v in self.signos.items()}
 
+        # Ruidos intestinales: la sexta columna de la tabla. No se ve, se oye.
+        # Sin toxidrome puesto (el profesor movió los deslizadores a mano) se
+        # asume lo normal, que es lo que no afirma nada.
+        t = TOXIDROMES.get(self.toxidrome) if self.toxidrome else None
+        ruidos = (t or {}).get("ruidos", "normales")
+
         # Los hallazgos salen de los signos que puso el profesor, no de una
         # curva: lo que dice el panel y lo que se ve en el televisor no pueden
         # separarse nunca.
@@ -273,6 +282,7 @@ class Estado:
             "estado_paciente": estado_paciente,
             "vitales": vitales,
             "visual": visual,
+            "ruidos": ruidos,
             "sistemas": sistemas,
             "sistema_seleccionado": self.sistema,
             "subvista": self.subvista,
@@ -389,7 +399,8 @@ PAGINAS = {"/monitor": "monitor.html", "/control": "control.html",
            "/facilitador": "facilitador.html", "/": "inicio.html"}
 TIPOS = {".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8",
          ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
-         ".png": "image/png", ".svg": "image/svg+xml", ".glb": "model/gltf-binary"}
+         ".png": "image/png", ".svg": "image/svg+xml", ".glb": "model/gltf-binary",
+         ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav"}
 
 
 class Manejador(BaseHTTPRequestHandler):
@@ -627,6 +638,22 @@ class Manejador(BaseHTTPRequestHandler):
                 E.signos[nombre] = d["normal"]
             E.toxidrome = None
             E.registrar("signos_normales")
+        elif accion == "maniobra":
+            # El estudiante las hace desde su control; esto deja que el
+            # profesor también, para poder mostrarlo él en una clase.
+            d = valor if isinstance(valor, dict) else {}
+            nombre = d.get("nombre")
+            if nombre not in MANIOBRAS or not MANIOBRAS[nombre]["disponible"]:
+                return self.responder(400, {"error": "maniobra desconocida"})
+            E.maniobras[nombre] = (not E.maniobras[nombre]) if d.get("valor") is None else bool(d.get("valor"))
+            exige = MANIOBRAS[nombre]["exige"]
+            if E.maniobras[nombre] and exige:
+                E.maniobras[exige] = True
+            if not E.maniobras[nombre]:
+                for otro, dd in MANIOBRAS.items():
+                    if dd["exige"] == nombre:
+                        E.maniobras[otro] = False
+            E.registrar("maniobra_profesor", maniobra=nombre, valor=E.maniobras[nombre])
         elif accion == "vitales_demo":
             E.vitales_demo = (not E.vitales_demo) if valor is None else bool(valor)
             E.registrar("vitales_demo", valor=E.vitales_demo)

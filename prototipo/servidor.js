@@ -121,6 +121,9 @@ const E = {
 const MANIOBRAS = {
   boca:   { nombre: "Abrir la boca", exige: null, disponible: true },
   lengua: { nombre: "Sacar la lengua", exige: "boca", disponible: true },
+  // La única de la tabla que no se ve, solo se oye. No exige nada: el
+  // fonendoscopio va al abdomen, no a la cara.
+  abdomen: { nombre: "Auscultar el abdomen", exige: null, disponible: true },
 };
 
 function nuevaSesion() {
@@ -219,6 +222,9 @@ function calcular() {
     transcurrido_s: Math.round(transcurrido() * 10) / 10,
     estado_paciente: estadoPaciente,
     vitales, visual, sistemas,
+    // Ruidos intestinales: la sexta columna de la tabla. No se ve, se oye.
+    // Sin toxidrome puesto se asume lo normal, que es lo que no afirma nada.
+    ruidos: (TOXIDROMES[E.toxidrome] || {}).ruidos || "normales",
     sistema_seleccionado: E.sistema,
     subvista: E.subvista,
     datos_reales: real,
@@ -276,6 +282,7 @@ const TIPOS = {
   ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
   ".png": "image/png", ".svg": "image/svg+xml", ".glb": "model/gltf-binary",
+  ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav",
 };
 
 function responder(res, codigo, cuerpo, tipo = "application/json; charset=utf-8", extra = {}) {
@@ -417,6 +424,19 @@ function facilitador(c) {
     for (const [nombre, d] of Object.entries(SIGNOS)) E.signos[nombre] = d.normal;
     E.toxidrome = null;
     registrar("signos_normales");
+  } else if (accion === "maniobra") {
+    // El estudiante las hace desde su control; esto deja que el profesor
+    // también, para poder mostrarlo el en una clase.
+    const d = (c.valor && typeof c.valor === "object") ? c.valor : {};
+    const nombre = d.nombre;
+    if (!MANIOBRAS[nombre] || !MANIOBRAS[nombre].disponible)
+      return { codigo: 400, cuerpo: { error: "maniobra desconocida" } };
+    E.maniobras[nombre] = d.valor === undefined ? !E.maniobras[nombre] : Boolean(d.valor);
+    const exige = MANIOBRAS[nombre].exige;
+    if (E.maniobras[nombre] && exige) E.maniobras[exige] = true;
+    if (!E.maniobras[nombre])
+      for (const [otro, dd] of Object.entries(MANIOBRAS)) if (dd.exige === nombre) E.maniobras[otro] = false;
+    registrar("maniobra_profesor", { maniobra: nombre, valor: E.maniobras[nombre] });
   } else if (accion === "vitales_demo") {
     E.vitales_demo = c.valor === undefined ? !E.vitales_demo : Boolean(c.valor);
     registrar("vitales_demo", { valor: E.vitales_demo });

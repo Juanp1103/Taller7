@@ -142,6 +142,7 @@
     <button class="bt primario" id="btIniciar">Iniciar sesión</button>
     <button class="bt" id="btPausar">Pausar</button>
     <button class="bt peligro" id="btReiniciar">Reiniciar</button>
+    <button class="bt" id="btAbdomen">Auscultar abdomen</button>
     <button class="bt" id="btVitales">Signos vitales</button>
     <button class="bt" id="btMonitor">Abrir televisor</button>
   </div>
@@ -211,6 +212,9 @@ const accion = (a, v) => enviar("/api/facilitador", { accion: a, valor: v });
 /* Sin el simulador prestado no hay vitales de verdad. Este botón enciende
  * unos de DEMOSTRACIÓN, sacados de la tabla de los médicos, para poder mostrar
  * el producto completo. El televisor los marca como simulados. */
+/* La auscultación la hace normalmente el estudiante desde su control; este
+ * botón deja que el profesor también la ponga, para mostrarla él en clase. */
+$("btAbdomen").onclick = () => accion("maniobra", { nombre: "abdomen" });
 $("btVitales").onclick = () => accion("vitales_demo");
 $("btIniciar").onclick = () => accion("iniciar");
 $("btPausar").onclick = () => accion("pausar");
@@ -315,6 +319,10 @@ function render(s) {
   $("estadoTxt").textContent = s.estado_paciente;
   $("reloj").textContent = reloj(s.transcurrido_s);
   $("reloj").classList.toggle("pausa", s.iniciado && !s.corriendo);
+  const ab = !!(s.maniobras && s.maniobras.abdomen);
+  $("btAbdomen").classList.toggle("primario", ab);
+  $("btAbdomen").textContent = ab ? "Auscultando: SÍ" : "Auscultar abdomen";
+  $("btAbdomen").title = "Pone o quita el fonendoscopio en el abdomen. El televisor reproduce los ruidos intestinales que correspondan al toxidrome (hay que tener el sonido encendido allá).";
   const vd = !!s.vitales_demo, vr = !!s.datos_reales;
   $("btVitales").classList.toggle("primario", vd && !vr);
   $("btVitales").textContent = vr ? "Vitales reales" : (vd ? "Vitales simulados: SÍ" : "Signos vitales");

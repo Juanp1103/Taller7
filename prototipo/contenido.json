@@ -143,7 +143,8 @@
         "fr": 16,
         "etco2": 38,
         "temp": 36.7
-      }
+      },
+      "ruidos": "normales"
     },
     {
       "id": "anticolinergico",
@@ -166,7 +167,8 @@
         "fr": 18,
         "etco2": 36,
         "temp": 38.9
-      }
+      },
+      "ruidos": "ausentes"
     },
     {
       "id": "colinergico",
@@ -189,7 +191,8 @@
         "fr": 18,
         "etco2": 42,
         "temp": 36.6
-      }
+      },
+      "ruidos": "aumentados"
     },
     {
       "id": "opioide",
@@ -212,7 +215,8 @@
         "fr": 6,
         "etco2": 58,
         "temp": 35.6
-      }
+      },
+      "ruidos": "ausentes"
     },
     {
       "id": "simpaticomimetico",
@@ -235,7 +239,8 @@
         "fr": 26,
         "etco2": 31,
         "temp": 38.6
-      }
+      },
+      "ruidos": "aumentados"
     },
     {
       "id": "sedante",
@@ -258,7 +263,8 @@
         "fr": 9,
         "etco2": 50,
         "temp": 35.8
-      }
+      },
+      "ruidos": "ausentes"
     }
   ],
   "sistemas": [
@@ -358,5 +364,6 @@
       "decimales": 1
     }
   },
-  "_nota_vitales": "Con el lector del monitor del simulador conectado, el televisor muestra los valores REALES. Sin lector no se muestra nada, salvo que el profesor encienda a mano los VALORES SIMULADOS desde su panel: ahí se usan los 'vitales_demo' de cada toxidrome, que salen de la columna de la tabla de los médicos que la cara no puede mostrar (FC y TA, respiración y temperatura). El televisor los marca SIM y lo dice en pantalla, para que nadie los confunda con una medición."
+  "_nota_vitales": "Con el lector del monitor del simulador conectado, el televisor muestra los valores REALES. Sin lector no se muestra nada, salvo que el profesor encienda a mano los VALORES SIMULADOS desde su panel: ahí se usan los 'vitales_demo' de cada toxidrome, que salen de la columna de la tabla de los médicos que la cara no puede mostrar (FC y TA, respiración y temperatura). El televisor los marca SIM y lo dice en pantalla, para que nadie los confunda con una medición.",
+  "_nota_ruidos": "Ruidos intestinales: es la sexta columna de la tabla de los médicos y la única que no se puede ver, solo oír. El estudiante ausculta el abdomen desde su control (o el profesor desde el panel) y el televisor reproduce lo que se oiría: aumentados, normales o ausentes según el toxidrome. 'Ausentes' no es silencio total: se oye el fonendoscopio sin ruidos, que es lo que se oye de verdad y además evita que el grupo crea que se dañó el sonido."
 }

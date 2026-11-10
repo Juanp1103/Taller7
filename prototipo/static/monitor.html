@@ -43,6 +43,7 @@
   .bt-sonido .p { opacity: .35; }
   .bt-sonido.on { color: var(--ecg); border-color: rgba(43,212,107,.45); background: rgba(43,212,107,.08); }
   .bt-sonido.on .p { opacity: 1; }
+  .chip.ausculta { color: var(--cian, #45c8dc); border-color: rgba(69,200,220,.45); background: rgba(69,200,220,.08); }
   .tiempo { font-family: var(--mono); font-size: 24px; color: var(--texto-2); min-width: 120px; text-align: right; }
   .estado { font-family: var(--mono); font-size: 17px; letter-spacing: .14em; font-weight: 700; padding: 11px 20px; border-radius: 999px; border: 1px solid; display: inline-flex; gap: 10px; align-items: center; }
   .estado .p { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
@@ -176,7 +177,8 @@
       <div class="sub" id="subtitulo">Paciente · —</div>
     </div>
     <div class="der">
-      <button class="chip bt-sonido oculto" id="btSonido" type="button" title="Enciende o apaga el pitido del monitor (tecla S)"><span class="p"></span><span id="sonidoTxt">SONIDO</span></button>
+      <span class="chip ausculta oculto" id="ausculta"><span class="p"></span><span id="auscultaTxt">AUSCULTANDO EL ABDOMEN</span></span>
+      <button class="chip bt-sonido" id="btSonido" type="button" title="Enciende o apaga el pitido del monitor (tecla S)"><span class="p"></span><span id="sonidoTxt">SONIDO</span></button>
       <span class="chip demo" id="fuente"><span class="p"></span><span id="fuenteTxt">MODO DEMO</span></span>
       <span class="tiempo" id="tiempo">T+ 00:00</span>
       <span class="estado espera" id="estado"><span class="p"></span><span id="estadoTxt">EN ESPERA</span></span>
@@ -479,7 +481,10 @@ function render(e) {
 
   // El distintivo de la fuente solo tiene sentido si hay vitales que calificar.
   // El botón del sonido solo tiene sentido si hay algo que pitar.
-  $("btSonido").classList.toggle("oculto", !hayVitales);
+  // Mientras el estudiante ausculta, el salón tiene que saber por qué suena
+  // (y sobre todo, si no suena nada, que eso ES el hallazgo).
+  $("ausculta").classList.toggle("oculto", !(e.maniobras && e.maniobras.abdomen));
+
   if (hayVitales && Object.values(e.vitales).some((v) => v.severidad === "crit")) Sonido.alarma();
   $("fuente").className = "chip " + (e.datos_reales ? "real" : "demo") + (hayVitales ? "" : " oculto");
   $("fuenteTxt").textContent = e.datos_reales
@@ -578,51 +583,81 @@ function renderPines(e) {
 }
 
 /* ---------- sonido del monitor ----------
- * El pitido del latido y la alarma se SINTETIZAN aquí: no hay archivos de
- * audio que cargar, así que esto funciona igual con el salón sin internet.
+ * Tres cosas, y ninguna necesita internet: los dos sonidos grabados viven en
+ * static/sonidos/ y el fonendoscopio se sintetiza aquí.
  *
- * Dos cosas, como en un monitor de verdad:
- *   - un pip por latido, que suena en la onda R del trazo, no en cualquier
- *     momento; y cuyo TONO BAJA con la saturación, que es como suena un
- *     pulsioxímetro y es en sí mismo un hallazgo clínico;
- *   - una alarma de tres pitos cuando algún valor está en crítico, cada diez
- *     segundos y no seguido, que si no es insoportable en una clase.
+ *   - El PITIDO del latido suena en la onda R del trazo, no en cualquier
+ *     momento, y su tono BAJA con la saturación, como un pulsioxímetro de
+ *     verdad: a 84 % se oye claramente más grave que a 97. Eso ya es un
+ *     hallazgo por sí solo.
+ *   - La ALARMA son tres pitidos juntos cuando algún valor está en crítico,
+ *     una vez cada diez segundos y no seguido, que si no es insoportable.
+ *   - La AUSCULTACIÓN del abdomen: mientras está puesto el fonendoscopio se
+ *     oye un siseo de fondo, y encima caen los ruidos intestinales que
+ *     correspondan. "Ausentes" NO es silencio: se oye el fonendoscopio sin
+ *     ruidos, que es lo que se oye de verdad y además evita que el grupo
+ *     crea que se dañó el sonido.
  *
  * El navegador no deja sonar nada hasta que alguien toca la página, así que
- * el botón de la cabecera hace las dos cosas a la vez: desbloquea el audio y
- * enciende el sonido. Arranca apagado a propósito. */
+ * el botón de la cabecera hace las dos cosas: desbloquea el audio y enciende
+ * el sonido. Arranca apagado a propósito. */
 const Sonido = (() => {
   let ctx = null, encendido = false, ultimaAlarma = 0;
+  let maestro = null, bufer = {}, fonendo = null, bucleTripa = null, proximaTripa = 0;
 
   function asegurarContexto() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ctx = new AC();
+      maestro = ctx.createGain(); maestro.gain.value = 1; maestro.connect(ctx.destination);
+      for (const [clave, archivo] of Object.entries({
+        pitido: "/static/sonidos/pitido.mp3",
+        tripaNormal: "/static/sonidos/tripa_normal.mp3",
+        tripaAlta: "/static/sonidos/tripa_alta.mp3",
+      })) {
+        fetch(archivo).then((r) => r.arrayBuffer())
+          .then((b) => ctx.decodeAudioData(b))
+          .then((d) => { bufer[clave] = d; })
+          .catch(() => { /* sin ese sonido, el resto sigue andando */ });
+      }
     }
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   }
 
   function tono(frecuencia, duracion, volumen, tipo) {
-    const c = ctx; if (!c) return;
-    const t = c.currentTime;
-    const osc = c.createOscillator(), gan = c.createGain();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator(), gan = ctx.createGain();
     osc.type = tipo || "sine";
     osc.frequency.setValueAtTime(frecuencia, t);
     gan.gain.setValueAtTime(0, t);
     gan.gain.linearRampToValueAtTime(volumen, t + 0.006);
     gan.gain.exponentialRampToValueAtTime(0.0001, t + duracion);
-    osc.connect(gan); gan.connect(c.destination);
+    osc.connect(gan); gan.connect(maestro);
     osc.start(t); osc.stop(t + duracion + 0.02);
   }
 
+  function muestra(clave, volumen, velocidad, bucle) {
+    if (!ctx || !bufer[clave]) return null;
+    const f = ctx.createBufferSource(), g = ctx.createGain();
+    f.buffer = bufer[clave];
+    f.playbackRate.value = velocidad || 1;
+    f.loop = !!bucle;
+    g.gain.value = volumen;
+    f.connect(g); g.connect(maestro);
+    f.start();
+    return f;
+  }
+
   /* El tono del pulsioxímetro baja con la saturación: 100 % suena agudo y
-   * cada punto que baja lo oscurece. A 84 % se oye claramente más grave. */
+   * cada punto que baja lo oscurece. Con el sonido grabado eso se consigue
+   * cambiando la velocidad de reproducción. */
   function latido(spo2) {
     if (!encendido || !ctx) return;
     const sat = Math.min(100, Math.max(60, Number(spo2) || 98));
-    tono(880 * Math.pow(2, -(100 - sat) / 24), 0.09, 0.14);
+    muestra("pitido", 0.5, Math.pow(2, -(100 - sat) / 26));
   }
 
   function alarma() {
@@ -630,14 +665,59 @@ const Sonido = (() => {
     const ahora = performance.now();
     if (ahora - ultimaAlarma < 10000) return;      // una cada diez segundos
     ultimaAlarma = ahora;
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => tono(1180, 0.11, 0.13, "square"), i * 150);
+    for (let i = 0; i < 3; i++) setTimeout(() => tono(1180, 0.11, 0.13, "square"), i * 150);
+  }
+
+  /* El siseo del fonendoscopio: ruido rosado muy bajo, filtrado, que suena
+   * mientras el estudiante tiene el abdomen auscultado. */
+  function abrirFonendo() {
+    if (fonendo || !ctx) return;
+    const n = ctx.sampleRate * 2;
+    const b = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    let ultimo = 0;
+    for (let i = 0; i < n; i++) { ultimo = (ultimo + (Math.random() * 2 - 1) * 0.08) * 0.96; d[i] = ultimo; }
+    const f = ctx.createBufferSource(); f.buffer = b; f.loop = true;
+    const paso = ctx.createBiquadFilter(); paso.type = "lowpass"; paso.frequency.value = 700;
+    const g = ctx.createGain(); g.gain.value = 0.22;
+    f.connect(paso); paso.connect(g); g.connect(maestro);
+    f.start();
+    fonendo = { fuente: f, gan: g };
+  }
+  function cerrarFonendo() {
+    if (!fonendo) return;
+    try { fonendo.fuente.stop(); } catch (e) { /* ya estaba parada */ }
+    fonendo = null;
+  }
+  function pararTripa() {
+    if (bucleTripa) { try { bucleTripa.stop(); } catch (e) { /* ya estaba */ } bucleTripa = null; }
+  }
+
+  /* auscultando: ¿está puesto el fonendoscopio?   nivel: aumentados | normales | ausentes */
+  function abdomen(auscultando, nivel) {
+    if (!ctx || !encendido) { cerrarFonendo(); pararTripa(); return; }
+    if (!auscultando) { cerrarFonendo(); pararTripa(); return; }
+    abrirFonendo();
+    if (nivel === "aumentados") {
+      if (!bucleTripa) bucleTripa = muestra("tripaAlta", 0.85, 1, true);
+    } else {
+      pararTripa();
+      if (nivel === "normales") {
+        const ahora = performance.now();
+        if (ahora > proximaTripa) {
+          // un borborigmo suelto cada cuatro a nueve segundos
+          proximaTripa = ahora + 4000 + Math.random() * 5000;
+          muestra("tripaNormal", 0.75, 0.92 + Math.random() * 0.16);
+        }
+      }
+      // "ausentes": solo el fonendoscopio, sin ruidos. Eso ES el hallazgo.
     }
   }
 
   function alternar() {
     asegurarContexto();
     encendido = !encendido && !!ctx;
+    if (!encendido) { cerrarFonendo(); pararTripa(); }
     pintarBoton();
     if (encendido) tono(660, 0.07, 0.09);          // confirma que sí se oye
   }
@@ -649,7 +729,7 @@ const Sonido = (() => {
     $("sonidoTxt").textContent = encendido ? "SONIDO: SÍ" : "SONIDO: NO";
   }
 
-  return { latido, alarma, alternar, pintarBoton, activo: () => encendido };
+  return { latido, alarma, abdomen, alternar, pintarBoton, activo: () => encendido };
 })();
 
 $("btSonido").onclick = () => Sonido.alternar();
@@ -657,6 +737,12 @@ addEventListener("keydown", (ev) => {
   if ((ev.key === "s" || ev.key === "S") && !ev.metaKey && !ev.ctrlKey && !ev.altKey) Sonido.alternar();
 });
 Sonido.pintarBoton();
+// La auscultación se revisa seguido, no solo cuando llega un estado nuevo:
+// los borborigmos sueltos tienen que ir cayendo solos.
+setInterval(() => {
+  const e = estado;
+  Sonido.abdomen(!!(e && e.maniobras && e.maniobras.abdomen), (e && e.ruidos) || "normales");
+}, 700);
 
 /* ---------- trazo de ECG (barrido tipo monitor) ---------- */
 (function ecg() {
